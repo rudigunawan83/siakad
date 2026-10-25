@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="SIAKAD Cakrawala — Sistem Informasi Akademik & Campus ERP Multi-Kampus. Prototype interaktif untuk demonstrasi.">
+  <meta name="author" content="Yayasan Cakrawala Pendidikan">
+  <meta name="robots" content="noindex">
+  <title>SIAKAD Cakrawala — Campus ERP Prototype</title>
+
+  <!-- Bootstrap 5.3 CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <!-- Bootstrap Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Design System -->
+  <link rel="stylesheet" href="css/tokens.css">
+  <link rel="stylesheet" href="css/layout.css?v=20261025f">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/pages.css?v=20261025f">
+
+  <style>
+    /* Critical inline styles for initial load */
+    body { margin: 0; font-family: 'Inter', 'Segoe UI', sans-serif; background: var(--color-bg); }
+    #app-shell { display: flex; height: 100vh; overflow: hidden; }
+    #sidebar { width: var(--sidebar-width); min-width: var(--sidebar-width); background: var(--color-navy-900); overflow-y: auto; overflow-x: hidden; flex-shrink: 0; position: relative; transition: var(--transition-sidebar); display: flex; flex-direction: column; z-index: var(--z-sidebar); }
+    #sidebar.collapsed { width: var(--sidebar-collapsed-width); min-width: var(--sidebar-collapsed-width); }
+    #main-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+    #topbar { height: var(--topbar-height); background: var(--color-surface); border-bottom: 1px solid var(--color-border); display: flex; align-items: center; padding: 0 1.5rem; gap: 0.75rem; flex-shrink: 0; z-index: var(--z-topbar); box-shadow: var(--shadow-sm); }
+    #content { flex: 1; overflow-y: auto; overflow-x: hidden; background: var(--color-bg); }
+    /* Splash */
+    #splash { position: fixed; inset: 0; background: var(--color-navy-900); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; transition: opacity 0.5s ease; }
+    #splash.hidden { opacity: 0; pointer-events: none; }
+    .splash-logo { width: 64px; height: 64px; margin-bottom: 1rem; animation: splashPulse 1s ease-in-out infinite alternate; }
+    .splash-title { color: white; font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem; }
+    .splash-sub { color: rgba(255,255,255,0.5); font-size: 0.875rem; }
+    .splash-progress { width: 200px; height: 3px; background: rgba(255,255,255,0.1); border-radius: 99px; margin-top: 2rem; overflow: hidden; }
+    .splash-bar { height: 100%; background: var(--color-gold-500); border-radius: 99px; animation: splashLoad 1.2s ease forwards; }
+    @keyframes splashPulse { from { transform: scale(1); opacity: 0.8; } to { transform: scale(1.05); opacity: 1; } }
+    @keyframes splashLoad { from { width: 0; } to { width: 100%; } }
+    /* Mobile overlay */
+    #sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: calc(var(--z-sidebar) - 1); }
+    @media (max-width: 991px) {
+      #sidebar { position: fixed; top: 0; left: 0; height: 100%; transform: translateX(-100%); }
+      #sidebar.mobile-open { transform: translateX(0); }
+      #main-area { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Splash Screen -->
+<div id="splash">
+  <img src="assets/logo.svg" alt="SIAKAD Logo" class="splash-logo">
+  <div class="splash-title">SIAKAD Cakrawala</div>
+  <div class="splash-sub">Campus ERP — Mode Demo Prototype</div>
+  <div class="splash-progress"><div class="splash-bar"></div></div>
+</div>
+
+<!-- App Shell -->
+<div id="app-shell">
+  <!-- Sidebar -->
+  <aside id="sidebar" role="navigation" aria-label="Navigasi Utama"></aside>
+
+  <!-- Mobile Overlay -->
+  <div id="sidebar-overlay"></div>
+
+  <!-- Main Area -->
+  <div id="main-area">
+    <!-- Topbar -->
+    <header id="topbar" role="banner"></header>
+    <!-- Page Content -->
+    <main id="content" role="main"></main>
+  </div>
+</div>
+
+<!-- Toast Container (injected by toast.js) -->
+
+<!-- Bootstrap 5.3 Bundle (JS) -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+
+<!-- App Entry Point -->
+<script type="module" src="js/app.js?v=20261025f"></script>
+
+<script>
+  // Hide splash after app loads
+  window.addEventListener('load', () => {
+    setTimeout(() => {
+      const splash = document.getElementById('splash');
+      if (splash) splash.classList.add('hidden');
+      setTimeout(() => { if (splash) splash.remove(); }, 600);
+    }, 1400);
+  });
+</script>
+
+</body>
+</html>

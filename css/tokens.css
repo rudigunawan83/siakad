@@ -1,0 +1,127 @@
+/* =========================================================
+   SIAKAD Cakrawala — Design Tokens
+   Premium Enterprise: White, Navy, Gold Accent
+   ========================================================= */
+
+:root {
+  /* --- Color Palette --- */
+  --color-navy-950: #101a2b;
+  --color-navy-900: #16243a;
+  --color-navy-800: #213550;
+  --color-navy-700: #2d4a6e;
+  --color-navy-600: #3a5f8a;
+  --color-navy-300: #8aaece;
+  --color-navy-200: #c2d4e8;
+  --color-navy-100: #e0eaf5;
+  --color-navy-50:  #f0f5fb;
+
+  --color-gold-600: #b88a2b;
+  --color-gold-500: #d1a84b;
+  --color-gold-400: #e0be72;
+  --color-gold-300: #edd18a;
+  --color-gold-100: #f7efd9;
+  --color-gold-50:  #fdf8ed;
+
+  --color-bg:       #f5f7fa;
+  --color-surface:  #ffffff;
+  --color-surface-2:#f8fafd;
+  --color-text:     #202938;
+  --color-muted:    #475569;
+  --color-muted-2:  #94a3b8;
+  --color-border:   #e3e8ef;
+  --color-border-2: #d1d9e3;
+
+  --color-success:        #198754;
+  --color-success-light:  #d1e7dd;
+  --color-success-dark:   #0f5132;
+  --color-warning:        #d97706;
+  --color-warning-light:  #fff3cd;
+  --color-warning-dark:   #664d03;
+  --color-danger:         #dc3545;
+  --color-danger-light:   #f8d7da;
+  --color-danger-dark:    #721c24;
+  --color-info:           #0d6efd;
+  --color-info-light:     #cfe2ff;
+  --color-info-dark:      #084298;
+
+  /* --- Accent / Brand --- */
+  --color-accent:       var(--color-gold-500);
+  --color-accent-hover: var(--color-gold-600);
+  --color-primary:      var(--color-navy-800);
+  --color-primary-hover:var(--color-navy-700);
+
+  /* --- Typography --- */
+  --font-sans:    'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-heading: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
+  --font-mono:    'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+
+  --text-xs:   0.75rem;    /* 12px */
+  --text-sm:   0.875rem;   /* 14px */
+  --text-base: 1rem;       /* 16px */
+  --text-lg:   1.125rem;   /* 18px */
+  --text-xl:   1.25rem;    /* 20px */
+  --text-2xl:  1.5rem;     /* 24px */
+  --text-3xl:  1.875rem;   /* 30px */
+
+  --font-normal:   400;
+  --font-medium:   500;
+  --font-semibold: 600;
+  --font-bold:     700;
+
+  /* --- Spacing --- */
+  --space-1:  0.25rem;
+  --space-2:  0.5rem;
+  --space-3:  0.75rem;
+  --space-4:  1rem;
+  --space-5:  1.25rem;
+  --space-6:  1.5rem;
+  --space-8:  2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+
+  /* --- Border Radius --- */
+  --radius-sm:  6px;
+  --radius-md:  10px;
+  --radius-lg:  14px;
+  --radius-xl:  20px;
+  --radius-full: 9999px;
+
+  /* --- Shadows --- */
+  --shadow-xs:   0 1px 2px rgba(16, 26, 43, 0.05);
+  --shadow-sm:   0 1px 4px rgba(16, 26, 43, 0.06);
+  --shadow-card: 0 4px 16px rgba(16, 26, 43, 0.06);
+  --shadow-md:   0 8px 24px rgba(16, 26, 43, 0.08);
+  --shadow-lg:   0 16px 40px rgba(16, 26, 43, 0.12);
+  --shadow-xl:   0 24px 64px rgba(16, 26, 43, 0.16);
+
+  /* --- Layout --- */
+  --sidebar-width:           248px;
+  --sidebar-collapsed-width: 64px;
+  --topbar-height:           56px;
+  --content-max-width:       1400px;
+
+  /* --- Transitions --- */
+  --transition-fast:   150ms ease;
+  --transition-normal: 250ms ease;
+  --transition-slow:   350ms ease;
+
+  /* --- Z-Index Scale --- */
+  --z-dropdown:  1000;
+  --z-sticky:    1020;
+  --z-fixed:     1030;
+  --z-modal-bg:  1040;
+  --z-offcanvas: 1045;
+  --z-modal:     1055;
+  --z-popover:   1070;
+  --z-toast:     1090;
+}
+
+/* Dark theme placeholder (optional in future) */
+[data-theme="dark"] {
+  --color-bg:      #0e1621;
+  --color-surface: #162133;
+  --color-text:    #e5eaf2;
+  --color-muted:   #8ea3b9;
+  --color-border:  #2a3a50;
+}

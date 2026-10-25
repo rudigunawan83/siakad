@@ -1,0 +1,415 @@
+/**
+ * SIAKAD — Finance Pages
+ */
+import { DB } from '../data/seed.js';
+import { AppState } from '../state.js';
+import { formatRupiah, formatDate, statusBadge, exportCSV, generateId, today } from '../utils.js';
+import { DataTable } from '../components/data-table.js';
+import { openFormModal } from '../components/modal.js';
+import { showToast, showConfirm } from '../components/toast.js';
+import { createBarChart, createLineChart, createDoughnutChart, formatRupiahShort } from '../components/charts.js';
+
+let _table;
+
+export function renderFinance(path, container) {
+  if (path.includes('/payments'))    return renderPayments(container);
+  if (path.includes('/receivables')) return renderReceivables(container);
+  if (path.includes('/journals'))    return renderJournals(container);
+  if (path.includes('/coa'))         return renderCOA(container);
+  if (path.includes('/reports'))     return renderFinanceReports(container);
+  if (path.includes('/invoices'))    return renderInvoices(container);
+  // Default: dashboard
+  renderFinanceDashboard(container);
+}
+
+// ---- Finance Dashboard ----
+function renderFinanceDashboard(container) {
+  const invoices = DB.getAll('invoices');
+  const payments = DB.getAll('payments');
+  const campusFilter = AppState.currentCampusFilter;
+  const filtInv = campusFilter==='all' ? invoices : invoices.filter(i=>i.campusId===campusFilter);
+
+  const totalBilled   = filtInv.reduce((s,i)=>s+i.amount,0);
+  const totalPaid     = filtInv.reduce((s,i)=>s+i.paid,0);
+  const totalOverdue  = filtInv.filter(i=>i.status==='jatuh tempo').reduce((s,i)=>s+i.remaining,0);
+  const totalPartial  = filtInv.filter(i=>i.status==='dibayar sebagian').reduce((s,i)=>s+i.remaining,0);
+  const collectRate   = totalBilled>0 ? Math.round(totalPaid/totalBilled*100) : 0;
+
+  container.innerHTML = `
+<div class="page-container">
+  <div class="page-header">
+    <div class="page-header-info">
+      <h1 class="page-title">Dashboard Keuangan</h1>
+      <p class="page-desc">Ringkasan keuangan Semester Ganjil 2026/2027</p>
+    </div>
+    <div class="page-actions">
+      <a href="#/finance/invoices" class="btn btn-secondary"><i class="bi bi-receipt"></i> Tagihan</a>
+      <a href="#/finance/payments" class="btn btn-secondary"><i class="bi bi-cash"></i> Pembayaran</a>
+      <a href="#/finance/reports" class="btn btn-accent"><i class="bi bi-file-earmark-bar-graph"></i> Laporan</a>
+    </div>
+  </div>
+  <div class="kpi-grid">
+    <div class="kpi-card kpi-card-navy"><div class="kpi-icon" style="background:#21355015;color:var(--color-navy-800)"><i class="bi bi-receipt-cutoff"></i></div><div class="kpi-value">${formatRupiah(totalBilled)}</div><div class="kpi-label">Total Tagihan</div></div>
+    <div class="kpi-card kpi-card-success"><div class="kpi-icon" style="background:#19875415;color:var(--color-success)"><i class="bi bi-cash-coin"></i></div><div class="kpi-value">${formatRupiah(totalPaid)}</div><div class="kpi-label">Total Terbayar</div><div class="kpi-trend up"><i class="bi bi-arrow-up-short"></i> Collection Rate: ${collectRate}%</div></div>
+    <div class="kpi-card kpi-card-danger"><div class="kpi-icon" style="background:#dc354515;color:var(--color-danger)"><i class="bi bi-exclamation-circle"></i></div><div class="kpi-value">${formatRupiah(totalOverdue)}</div><div class="kpi-label">Tagihan Jatuh Tempo</div></div>
+    <div class="kpi-card kpi-card-warning"><div class="kpi-icon" style="background:#d9770615;color:var(--color-warning)"><i class="bi bi-hourglass-split"></i></div><div class="kpi-value">${formatRupiah(totalPartial)}</div><div class="kpi-label">Sisa Cicilan</div></div>
+  </div>
+
+  <!-- Collection Rate -->
+  <div class="card" style="margin-bottom:1.5rem">
+    <div class="card-body">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
+        <span style="font-size:var(--text-sm);font-weight:var(--font-semibold)">Tingkat Kolektibilitas</span>
+        <strong style="color:${collectRate>=80?'var(--color-success)':'var(--color-warning)'}">${collectRate}%</strong>
+      </div>
+      <div class="progress-bar-wrap">
+        <div class="progress-bar-fill ${collectRate>=80?'fill-success':'fill-warning'}" style="width:${collectRate}%"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="chart-grid">
+    <div class="chart-card">
+      <div class="chart-card-header"><h3 class="chart-card-title">Tren Penerimaan Bulanan</h3></div>
+      <div class="chart-wrapper" style="height:240px"><canvas id="rev-monthly"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-card-header"><h3 class="chart-card-title">Status Tagihan</h3></div>
+      <div class="chart-wrapper" style="height:240px"><canvas id="inv-status"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Aging Analysis -->
+  <div class="card" style="margin-top:1.5rem">
+    <div class="card-header"><h3 class="card-title">Analisis Piutang (Aging)</h3></div>
+    <div class="card-body">
+      <div class="aging-grid">
+        ${[
+          { label: '0–30 hari', amount: 2500000, count: 1, color: 'var(--color-success)' },
+          { label: '31–60 hari', amount: 0, count: 0, color: 'var(--color-warning)' },
+          { label: '61–90 hari', amount: 0, count: 0, color: 'var(--color-warning)' },
+          { label: '>90 hari', amount: 6500000+4800000, count: 2, color: 'var(--color-danger)' },
+          { label: 'Total', amount: totalOverdue+totalPartial, count: filtInv.filter(i=>i.remaining>0).length, color: 'var(--color-navy-800)' },
+        ].map(b=>`
+          <div class="aging-bucket">
+            <div class="aging-bucket-label">${b.label}</div>
+            <div class="aging-bucket-value" style="color:${b.color}">${formatRupiah(b.amount)}</div>
+            <div class="aging-bucket-count">${b.count} tagihan</div>
+          </div>`).join('')}
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick Access COA -->
+  <div style="display:flex;gap:0.75rem;flex-wrap:wrap;margin-top:1.5rem">
+    <a href="#/finance/journals" class="btn btn-secondary"><i class="bi bi-journal-text"></i> Jurnal Umum</a>
+    <a href="#/finance/ledger" class="btn btn-secondary"><i class="bi bi-book"></i> Buku Besar</a>
+    <a href="#/finance/coa" class="btn btn-secondary"><i class="bi bi-list-nested"></i> Bagan Akun (COA)</a>
+    <a href="#/finance/consolidation" class="btn btn-secondary"><i class="bi bi-building"></i> Konsolidasi Yayasan</a>
+  </div>
+</div>`;
+
+  requestAnimationFrame(() => {
+    createLineChart('rev-monthly', {
+      labels:['Jul','Agu','Sep','Okt','Nov','Des'],
+      datasets:[{ label:'Penerimaan', data:[280,620,540,310,0,0].map(v=>v*100000), color:'#213550' }],
+      height:240, fill:true, formatY: formatRupiahShort,
+    });
+    const statusGroups = {};
+    filtInv.forEach(i=>{ statusGroups[i.status]=(statusGroups[i.status]||0)+1; });
+    createDoughnutChart('inv-status', {
+      labels: Object.keys(statusGroups),
+      data: Object.values(statusGroups),
+      colors:['#198754','#d97706','#dc3545','#0d6efd','#9ca3af'],
+      height: 240,
+    });
+  });
+}
+
+// ---- Invoices ----
+function renderInvoices(container) {
+  const campuses = DB.getAll('campuses');
+  const statusOpts = ['all','lunas','dibayar sebagian','terbit','jatuh tempo','dibatalkan'].map(s=>({value:s,label:s==='all'?'Semua Status':s}));
+  const typeOpts = ['all','UKT','Biaya Pendaftaran','Biaya Wisuda'].map(s=>({value:s,label:s==='all'?'Semua Jenis':s}));
+
+  container.innerHTML = `
+<div class="page-container">
+  <div class="page-header">
+    <div class="page-header-info"><h1 class="page-title">Tagihan Mahasiswa</h1><p class="page-desc">Kelola tagihan UKT dan biaya akademik</p></div>
+    <div class="page-actions">
+      <button class="btn btn-secondary" id="exp-csv"><i class="bi bi-download"></i> Export</button>
+      <button class="btn btn-accent" id="add-inv"><i class="bi bi-plus-lg"></i> Buat Tagihan</button>
+    </div>
+  </div>
+  <div class="filter-bar" style="border-radius:var(--radius-lg) var(--radius-lg) 0 0;margin-bottom:0">
+    <div class="search-input" style="flex:1;min-width:160px"><i class="bi bi-search"></i><input type="text" id="inv-search" placeholder="Cari nama, NIM, no. tagihan..."></div>
+    <select class="filter-select" id="status-f">${statusOpts.map(o=>`<option value="${o.value}">${o.label}</option>`).join('')}</select>
+    <select class="filter-select" id="type-f">${typeOpts.map(o=>`<option value="${o.value}">${o.label}</option>`).join('')}</select>
+    <button class="btn btn-secondary btn-sm" id="clear-f">Reset</button>
+  </div>
+  <div id="inv-table"></div>
+</div>`;
+
+  const invoices = DB.getAll('invoices');
+  const students = DB.getAll('students');
+
+  _table = new DataTable({
+    containerId: 'inv-table',
+    columns: [
+      { key: 'number', label: 'No. Tagihan', render: r=>`<strong>${r.number}</strong>` },
+      { key: 'studentName', label: 'Mahasiswa', render: r=>`<div>${r.studentName}</div><div style="font-size:10px;color:var(--color-muted)">${r.nim}</div>` },
+      { key: 'type', label: 'Jenis' },
+      { key: 'period', label: 'Periode' },
+      { key: 'amount', label: 'Tagihan', render: r=>`<strong>${formatRupiah(r.amount)}</strong>` },
+      { key: 'paid', label: 'Terbayar', render: r=>`<span style="color:var(--color-success)">${formatRupiah(r.paid)}</span>` },
+      { key: 'remaining', label: 'Sisa', render: r=>`<span style="color:${r.remaining>0?'var(--color-danger)':'var(--color-success)'}">${formatRupiah(r.remaining)}</span>` },
+      { key: 'dueDate', label: 'Jatuh Tempo', render: r=>formatDate(r.dueDate) },
+      { key: 'status', label: 'Status', render: r=>statusBadge(r.status) },
+      { key: '_actions', label: 'Aksi', sortable: false, render: r=>`
+        <div class="row-actions">
+          ${r.status!=='lunas'?`<button class="btn btn-success btn-sm" data-action="pay" data-id="${r.id}"><i class="bi bi-cash-coin"></i> Bayar</button>`:''}
+          <button class="btn btn-secondary btn-icon btn-sm" data-action="print" data-id="${r.id}" title="Cetak"><i class="bi bi-printer"></i></button>
+        </div>` },
+    ],
+    data: invoices,
+    searchFields: ['studentName','nim','number'],
+    defaultSort: 'dueDate',
+    onRowAction: (action, item) => {
+      if (action === 'pay') handlePayment(item);
+      if (action === 'print') showToast(`Mencetak tagihan ${item.number} (simulasi)...`, 'info');
+    },
+  });
+
+  // Bind events
+  const search = document.getElementById('inv-search');
+  let t;
+  search?.addEventListener('input', e=>{clearTimeout(t);t=setTimeout(()=>_table?.search(e.target.value),250);});
+  document.getElementById('status-f')?.addEventListener('change', e=>_table?.filter('status',e.target.value));
+  document.getElementById('type-f')?.addEventListener('change',   e=>_table?.filter('type',e.target.value));
+  document.getElementById('clear-f')?.addEventListener('click',   ()=>{ [search,document.getElementById('status-f'),document.getElementById('type-f')].forEach(el=>{if(el)el.value=el.tagName==='SELECT'?el.options[0].value:'';}); _table?.clearFilters(); });
+  document.getElementById('exp-csv')?.addEventListener('click', () => exportCSV(DB.getAll('invoices'),'tagihan',[{key:'number',label:'No Tagihan'},{key:'studentName',label:'Nama'},{key:'type',label:'Jenis'},{key:'amount',label:'Tagihan'},{key:'paid',label:'Terbayar'},{key:'remaining',label:'Sisa'},{key:'status',label:'Status'}]));
+}
+
+function handlePayment(invoice) {
+  import('../components/modal.js').then(({ openModal }) => {
+    openModal({
+      title: `Catat Pembayaran — ${invoice.number}`,
+      body: `
+        <div class="info-box info-box-warning" style="margin-bottom:1rem">
+          <i class="bi bi-lightning-fill"></i> <strong>Mode Simulasi:</strong> Pembayaran ini hanya dicatat dalam sistem demo.
+        </div>
+        <div class="stat-row"><span class="stat-row-label">Mahasiswa</span><span class="stat-row-value">${invoice.studentName}</span></div>
+        <div class="stat-row"><span class="stat-row-label">Periode</span><span class="stat-row-value">${invoice.period}</span></div>
+        <div class="stat-row"><span class="stat-row-label">Sisa Tagihan</span><span class="stat-row-value" style="color:var(--color-danger)">${formatRupiah(invoice.remaining)}</span></div>
+        <hr class="divider">
+        <div class="form-group">
+          <label class="form-label">Jumlah Bayar <span class="required">*</span></label>
+          <input type="number" id="pay-amount" class="form-control" value="${invoice.remaining}" min="1" max="${invoice.remaining}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Metode Pembayaran</label>
+          <select class="form-control form-select" id="pay-method">
+            <option>Transfer Bank (Simulasi)</option>
+            <option>Virtual Account (Simulasi)</option>
+            <option>QRIS (Simulasi)</option>
+            <option>Tunai (Simulasi)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Catatan</label>
+          <input type="text" id="pay-note" class="form-control" placeholder="Catatan opsional">
+        </div>`,
+      footer: `
+        <button class="btn btn-secondary" data-modal-close>Batal</button>
+        <button class="btn btn-success" id="confirm-pay">
+          <i class="bi bi-cash-coin"></i> Catat Pembayaran (Simulasi)
+        </button>`,
+    });
+
+    document.getElementById('confirm-pay')?.addEventListener('click', () => {
+      const amount = parseFloat(document.getElementById('pay-amount').value);
+      const method = document.getElementById('pay-method').value;
+      const note   = document.getElementById('pay-note').value;
+      if (!amount || amount<=0) { showToast('Jumlah bayar harus lebih dari 0.','warning'); return; }
+      const newPaid = invoice.paid + amount;
+      const newRemaining = Math.max(0, invoice.remaining - amount);
+      const newStatus = newRemaining===0 ? 'lunas' : 'dibayar sebagian';
+      DB.update('invoices', invoice.id, { paid: newPaid, remaining: newRemaining, status: newStatus });
+      const txNum = `TRX-${Date.now()}`;
+      DB.add('payments', { id: generateId('pay'), txNum, date: today(), studentName: invoice.studentName, invoiceId: invoice.id, method, amount, status: 'berhasil', officer: `${AppState.currentRole.user} (demo)`, note: `[SIMULASI] ${note}` });
+      DB.log('Catat Pembayaran Demo', 'Keuangan', `Tagihan: ${invoice.number}`);
+      import('../components/modal.js').then(m=>m.closeModal());
+      showToast(`Pembayaran ${formatRupiah(amount)} untuk ${invoice.studentName} berhasil dicatat (simulasi).`, 'success');
+      _table?.setData(DB.getAll('invoices'));
+    });
+  });
+}
+
+// ---- Payments ----
+function renderPayments(container) {
+  const payments = DB.getAll('payments');
+  container.innerHTML = `
+<div class="page-container">
+  <div class="page-header">
+    <div class="page-header-info"><h1 class="page-title">Riwayat Pembayaran</h1><p class="page-desc">Semua transaksi pembayaran mahasiswa</p></div>
+    <div class="page-actions"><button class="btn btn-secondary" id="exp-csv"><i class="bi bi-download"></i> Export</button></div>
+  </div>
+  <div id="pay-table"></div>
+</div>`;
+
+  const table = new DataTable({
+    containerId: 'pay-table',
+    columns: [
+      { key:'txNum', label:'No. Transaksi', render:r=>`<strong>${r.txNum}</strong>` },
+      { key:'date', label:'Tanggal', render:r=>formatDate(r.date) },
+      { key:'studentName', label:'Mahasiswa' },
+      { key:'method', label:'Metode' },
+      { key:'amount', label:'Jumlah', render:r=>`<strong style="color:var(--color-success)">${formatRupiah(r.amount)}</strong>` },
+      { key:'status', label:'Status', render:r=>statusBadge(r.status) },
+      { key:'officer', label:'Dicatat Oleh' },
+      { key:'note', label:'Catatan', render:r=>`<span style="font-size:10px;color:var(--color-muted)">${r.note||'-'}</span>` },
+    ],
+    data: payments,
+    searchFields: ['txNum','studentName'],
+    defaultSort: 'date',
+  });
+  document.getElementById('exp-csv')?.addEventListener('click', ()=>exportCSV(payments,'pembayaran',[{key:'txNum',label:'No TRX'},{key:'date',label:'Tgl'},{key:'studentName',label:'Mahasiswa'},{key:'method',label:'Metode'},{key:'amount',label:'Jumlah'},{key:'status',label:'Status'}]));
+}
+
+// ---- Receivables ----
+function renderReceivables(container) {
+  const invoices = DB.getAll('invoices').filter(i=>i.remaining>0);
+  const total = invoices.reduce((s,i)=>s+i.remaining,0);
+  container.innerHTML = `
+<div class="page-container">
+  <div class="page-header">
+    <div class="page-header-info"><h1 class="page-title">Piutang Mahasiswa</h1><p class="page-desc">Total piutang: <strong style="color:var(--color-danger)">${formatRupiah(total)}</strong> dari ${invoices.length} tagihan</p></div>
+    <div class="page-actions"><button class="btn btn-accent" id="send-reminder"><i class="bi bi-bell"></i> Kirim Reminder (Simulasi)</button></div>
+  </div>
+  <div id="rcv-table"></div>
+</div>`;
+
+  new DataTable({
+    containerId:'rcv-table',
+    columns:[
+      {key:'number',label:'No. Tagihan',render:r=>`<strong>${r.number}</strong>`},
+      {key:'studentName',label:'Mahasiswa',render:r=>`<div>${r.studentName}</div><div style="font-size:10px;color:var(--color-muted)">${r.nim}</div>`},
+      {key:'period',label:'Periode'},
+      {key:'amount',label:'Total',render:r=>formatRupiah(r.amount)},
+      {key:'paid',label:'Terbayar',render:r=>`<span style="color:var(--color-success)">${formatRupiah(r.paid)}</span>`},
+      {key:'remaining',label:'Piutang',render:r=>`<strong style="color:var(--color-danger)">${formatRupiah(r.remaining)}</strong>`},
+      {key:'dueDate',label:'Jatuh Tempo',render:r=>formatDate(r.dueDate)},
+      {key:'status',label:'Status',render:r=>statusBadge(r.status)},
+    ],
+    data:invoices, searchFields:['studentName','number'], defaultSort:'remaining',
+  });
+
+  document.getElementById('send-reminder')?.addEventListener('click',()=>showToast(`Reminder dikirim ke ${invoices.length} mahasiswa via email/SMS (simulasi).`,'gold'));
+}
+
+// ---- Journals ----
+function renderJournals(container) {
+  const journals = DB.getAll('journals');
+  const coa = DB.getAll('chartOfAccounts');
+  const getAccName = id => coa.find(c=>c.id===id)?.name||id;
+  container.innerHTML=`
+<div class="page-container">
+  <div class="page-header">
+    <div class="page-header-info"><h1 class="page-title">Jurnal Umum</h1><p class="page-desc">Pencatatan transaksi akuntansi (simulasi)</p></div>
+    <div class="page-actions"><a href="#/finance/coa" class="btn btn-secondary">Bagan Akun (COA)</a><a href="#/finance/ledger" class="btn btn-secondary">Buku Besar</a></div>
+  </div>
+  <div class="info-box" style="margin-bottom:1rem"><i class="bi bi-lightning-fill"></i> Jurnal di bawah ini merupakan simulasi pencatatan akuntansi double-entry untuk keperluan demo.</div>
+  <div class="card">
+    <div class="scroll-x">
+      <table class="data-table">
+        <thead><tr><th>No. Jurnal</th><th>Tanggal</th><th>Keterangan</th><th>Debit</th><th>Kredit</th><th>Jumlah</th><th>Status</th></tr></thead>
+        <tbody>${journals.map(j=>`<tr>
+          <td><strong>${j.number}</strong></td>
+          <td>${formatDate(j.date)}</td>
+          <td style="max-width:300px">${j.description}</td>
+          <td style="color:var(--color-success)">${getAccName(j.debit)}</td>
+          <td style="color:var(--color-danger)">${getAccName(j.credit)}</td>
+          <td><strong>${formatRupiah(j.amount)}</strong></td>
+          <td>${statusBadge(j.status==='posted'?'lunas':j.status)}</td>
+        </tr>`).join('')}</tbody>
+      </table>
+    </div>
+  </div>
+</div>`;
+}
+
+// ---- COA ----
+function renderCOA(container) {
+  const coa = DB.getAll('chartOfAccounts');
+  container.innerHTML=`
+<div class="page-container">
+  <div class="page-header">
+    <div class="page-header-info"><h1 class="page-title">Bagan Akun (COA)</h1><p class="page-desc">Daftar kode akun keuangan yayasan</p></div>
+  </div>
+  <div class="card">
+    <div class="scroll-x">
+      <table class="data-table">
+        <thead><tr><th>Kode</th><th>Nama Akun</th><th>Tipe</th><th>Kategori</th><th>Level</th><th>Status</th></tr></thead>
+        <tbody>${coa.map(c=>`<tr>
+          <td><code>${c.code}</code></td>
+          <td style="padding-left:${(c.level-1)*1.5}rem">${c.name}</td>
+          <td>${c.type}</td>
+          <td>${c.category}</td>
+          <td>${c.level}</td>
+          <td>${statusBadge(c.status)}</td>
+        </tr>`).join('')}</tbody>
+      </table>
+    </div>
+  </div>
+</div>`;
+}
+
+// ---- Finance Reports ----
+function renderFinanceReports(container) {
+  const invoices = DB.getAll('invoices');
+  const campuses = DB.getAll('campuses');
+  const totalRev = invoices.filter(i=>i.status==='lunas').reduce((s,i)=>s+i.paid,0);
+  container.innerHTML=`
+<div class="page-container">
+  <div class="page-header">
+    <div class="page-header-info"><h1 class="page-title">Laporan Keuangan</h1></div>
+    <div class="page-actions"><button class="btn btn-secondary" onclick="window.print()"><i class="bi bi-printer"></i> Cetak</button></div>
+  </div>
+  <div class="info-box info-box-warning" style="margin-bottom:1.5rem"><i class="bi bi-exclamation-triangle"></i> Laporan ini adalah <strong>simulasi demo</strong>. Data tidak mencerminkan kondisi keuangan sesungguhnya.</div>
+  <div class="chart-grid">
+    <div class="chart-card">
+      <div class="chart-card-header"><h3 class="chart-card-title">Pendapatan per Kampus</h3></div>
+      <div class="chart-wrapper" style="height:220px"><canvas id="rpt-campus"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-card-header"><h3 class="chart-card-title">Pendapatan vs Beban</h3></div>
+      <div class="chart-wrapper" style="height:220px"><canvas id="rpt-pnl"></canvas></div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:1.5rem">
+    <div class="card-header"><h3 class="card-title">Laporan Laba Rugi — Simulasi Q3 2026</h3></div>
+    <div class="card-body">
+      ${[
+        { label: 'Pendapatan UKT', amount: totalRev, type: 'income' },
+        { label: 'Pendapatan Biaya Pendaftaran', amount: 4200000, type: 'income' },
+        { label: 'Pendapatan Lain-lain', amount: 12500000, type: 'income' },
+        { label: 'Beban Gaji & Tunjangan', amount: -1640000000, type: 'expense' },
+        { label: 'Beban Operasional', amount: -280000000, type: 'expense' },
+        { label: 'Beban Penyusutan', amount: -42000000, type: 'expense' },
+      ].map(r=>`
+        <div class="stat-row">
+          <span class="stat-row-label" style="color:${r.type==='expense'?'var(--color-danger)':'inherit'}">${r.label}</span>
+          <span class="stat-row-value" style="color:${r.type==='expense'?'var(--color-danger)':'var(--color-success)'}">${formatRupiah(Math.abs(r.amount))}</span>
+        </div>`).join('')}
+      <div class="stat-row" style="border-top:2px solid var(--color-navy-900);margin-top:0.5rem;padding-top:0.5rem">
+        <span class="stat-row-label" style="font-weight:700;color:var(--color-navy-900)">Surplus / (Defisit)</span>
+        <span class="stat-row-value" style="font-weight:700;font-size:1rem;color:var(--color-navy-900)">${formatRupiah(totalRev+4200000+12500000-1640000000-280000000-42000000)}</span>
+      </div>
+    </div>
+  </div>
+</div>`;
+  requestAnimationFrame(()=>{
+    createBarChart('rpt-campus',{labels:campuses.map(c=>c.code),datasets:[{label:'Penerimaan',data:campuses.map(c=>invoices.filter(i=>i.campusId===c.id&&i.status==='lunas').reduce((s,i)=>s+i.paid,0)),color:'#213550'}],height:220,formatY:formatRupiahShort});
+    createBarChart('rpt-pnl',{labels:['Jul','Agu','Sep','Okt'],datasets:[{label:'Pendapatan',data:[580,620,820,310].map(v=>v*100000),color:'#198754'},{label:'Beban',data:[520,560,620,480].map(v=>v*100000),color:'#dc3545'}],height:220,formatY:formatRupiahShort});
+  });
+}
