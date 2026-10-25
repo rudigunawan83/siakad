@@ -1,7 +1,7 @@
-﻿/**
+/**
  * SIAKAD — Shared UI Helpers
  */
-import { AppState } from './state.js';
+import { AppState } from './state.js?v=20261025ab';
 
 /** Render halaman "Segera Hadir" */
 export function renderComingSoon(title, module, path) {

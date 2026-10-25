@@ -2,7 +2,7 @@
  * SIAKAD â€” Finance Pages
  */
 import { DB } from '../data/seed.js';
-import { AppState } from '../state.js';
+import { AppState } from '../state.js?v=20261025ab';
 import { formatRupiah, formatDate, statusBadge, exportCSV, generateId, today } from '../utils.js';
 import { DataTable } from '../components/data-table.js';
 import { openFormModal } from '../components/modal.js';
@@ -76,9 +76,9 @@ function getExpenseJournalRows(journals) {
 function buildAgingBuckets(invoices, referenceDate = today()) {
   const ref = parseDateOnly(referenceDate) || new Date();
   const buckets = [
-    { label: '0â€“30 hari', amount: 0, count: 0, color: 'var(--color-success)' },
-    { label: '31â€“60 hari', amount: 0, count: 0, color: 'var(--color-warning)' },
-    { label: '61â€“90 hari', amount: 0, count: 0, color: 'var(--color-warning)' },
+    { label: '0–30 hari', amount: 0, count: 0, color: 'var(--color-success)' },
+    { label: '31–60 hari', amount: 0, count: 0, color: 'var(--color-warning)' },
+    { label: '61–90 hari', amount: 0, count: 0, color: 'var(--color-warning)' },
     { label: '>90 hari', amount: 0, count: 0, color: 'var(--color-danger)' },
   ];
 

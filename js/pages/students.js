@@ -7,7 +7,8 @@ import { formatDate, statusBadge, exportCSV, generateId } from '../utils.js';
 import { DataTable } from '../components/data-table.js';
 import { openFormModal } from '../components/modal.js';
 import { showToast, showConfirm } from '../components/toast.js';
-import { renderStaffRegistration } from './registration.js';
+import { renderStaffRegistration } from './registration.js?v=20261025z';
+import { scopeRows, scopeCampuses, scopeStudyPrograms, scopeFaculties } from '../campus-scope.js';
 
 let _table;
 
@@ -25,9 +26,10 @@ export function renderStudents(path, container) {
   if (path.includes('/commencement')) return renderStudentCommencement(container);
   if (path.includes('/alumni')) return renderStudentAlumni(container);
 
-  const campuses     = DB.getAll('campuses');
-  const faculties    = DB.getAll('faculties');
-  const studyPrograms= DB.getAll('studyPrograms');
+  const campuses = scopeCampuses(DB.getAll('campuses'));
+  const studyPrograms = scopeStudyPrograms(DB.getAll('studyPrograms'));
+  const faculties = scopeFaculties(DB.getAll('faculties'), studyPrograms);
+  const students = scopeRows(DB.getAll('students'));
 
   const campusOpts = [{ value: 'all', label: 'Semua Kampus' }, ...campuses.map(c => ({ value: c.id, label: c.name }))];
   const statusOpts = [{ value: 'all', label: 'Semua Status' }, ...['aktif','cuti','nonaktif','lulus','dropout'].map(s => ({ value: s, label: s.charAt(0).toUpperCase()+s.slice(1) }))];
@@ -49,7 +51,7 @@ export function renderStudents(path, container) {
 
   <!-- Stats -->
   <div class="kpi-grid" style="grid-template-columns:repeat(5,1fr);margin-bottom:1.5rem">
-    ${buildStatusKPIs(DB.getAll('students'))}
+    ${buildStatusKPIs(students)}
   </div>
 
   <!-- Filter Bar -->
@@ -89,8 +91,8 @@ function renderStudentsEmptyState(title, description, detail = 'Belum ada data u
 }
 
 function renderStudentAcademicStatus(container) {
-  const students = DB.getAll('students');
-  const studyPrograms = DB.getAll('studyPrograms');
+  const students = scopeRows(DB.getAll('students'));
+  const studyPrograms = scopeStudyPrograms(DB.getAll('studyPrograms'));
   container.innerHTML = `
 <div class="page-container">
   <div class="page-header"><div class="page-header-info"><h1 class="page-title">Status Akademik</h1><p class="page-desc">Monitoring status studi, semester, dan indikator akademik mahasiswa</p></div></div>
@@ -113,8 +115,8 @@ function renderStudentAcademicStatus(container) {
 }
 
 function renderStudentLeave(container) {
-  const students = DB.getAll('students').filter(item => ['cuti', 'nonaktif'].includes(item.status));
-  const studyPrograms = DB.getAll('studyPrograms');
+  const students = scopeRows(DB.getAll('students')).filter(item => ['cuti', 'nonaktif'].includes(item.status));
+  const studyPrograms = scopeStudyPrograms(DB.getAll('studyPrograms'));
   if (!students.length) {
     container.innerHTML = renderStudentsEmptyState('Cuti & Aktif Kembali', 'Daftar mahasiswa cuti atau nonaktif.', 'Saat ini tidak ada mahasiswa yang sedang cuti atau menunggu aktif kembali.');
     return;
@@ -140,7 +142,7 @@ function renderStudentLeave(container) {
 
 function renderStudentScholarships(container) {
   const scholarships = DB.getAll('scholarships');
-  const students = DB.getAll('students');
+  const students = scopeRows(DB.getAll('students'));
   container.innerHTML = `
 <div class="page-container">
   <div class="page-header"><div class="page-header-info"><h1 class="page-title">Beasiswa & Keringanan</h1><p class="page-desc">Daftar bantuan pembiayaan mahasiswa aktif</p></div></div>
@@ -156,7 +158,7 @@ function renderStudentScholarships(container) {
       {key:'period',label:'Periode'},
       {key:'status',label:'Status',render:r=>statusBadge(r.status)},
     ],
-    data:scholarships,
+    data:scholarships.filter(item => students.some(student => student.id === item.studentId)),
     searchFields:['name','period'],
   });
 }
@@ -190,8 +192,8 @@ function renderStudentLetters(container) {
 }
 
 function renderStudentGraduation(container) {
-  const students = DB.getAll('students').filter(item => item.semester >= 7 && item.ipk >= 3);
-  const studyPrograms = DB.getAll('studyPrograms');
+  const students = scopeRows(DB.getAll('students')).filter(item => item.semester >= 7 && item.ipk >= 3);
+  const studyPrograms = scopeStudyPrograms(DB.getAll('studyPrograms'));
   if (!students.length) {
     container.innerHTML = renderStudentsEmptyState('Yudisium', 'Daftar calon peserta yudisium.', 'Belum ada mahasiswa yang memenuhi syarat yudisium pada data demo.');
     return;
@@ -217,7 +219,7 @@ function renderStudentGraduation(container) {
 }
 
 function renderStudentCommencement(container) {
-  const students = DB.getAll('students').filter(item => item.status === 'lulus');
+  const students = scopeRows(DB.getAll('students')).filter(item => item.status === 'lulus');
   if (!students.length) {
     container.innerHTML = renderStudentsEmptyState('Wisuda', 'Monitoring peserta wisuda dan persiapan administrasi.', 'Belum ada peserta wisuda pada seed demo. Setelah status mahasiswa lulus, data akan muncul di sini.');
     return;
@@ -226,7 +228,7 @@ function renderStudentCommencement(container) {
 }
 
 function renderStudentAlumni(container) {
-  const students = DB.getAll('students').filter(item => item.status === 'lulus');
+  const students = scopeRows(DB.getAll('students')).filter(item => item.status === 'lulus');
   if (!students.length) {
     container.innerHTML = renderStudentsEmptyState('Alumni', 'Database lulusan dan tracer study.', 'Belum ada data alumni pada demo saat ini.');
     return;
@@ -269,7 +271,7 @@ function buildStatusKPIs(students) {
 }
 
 function buildTable(studyPrograms, campuses, faculties) {
-  const students = DB.getAll('students');
+  const students = scopeRows(DB.getAll('students'));
 
   const columns = [
     { key: 'nim', label: 'NIM', render: r => `<strong>${r.nim}</strong>` },
@@ -421,7 +423,7 @@ function bindEvents(studyPrograms, campuses) {
   });
 
   document.getElementById('exp-csv')?.addEventListener('click', () => {
-    exportCSV(DB.getAll('students'), 'mahasiswa', [
+    exportCSV(scopeRows(DB.getAll('students')), 'mahasiswa', [
       {key:'nim',label:'NIM'},{key:'name',label:'Nama'},{key:'email',label:'Email'},
       {key:'campusId',label:'Kampus'},{key:'angkatan',label:'Angkatan'},
       {key:'semester',label:'Semester'},{key:'status',label:'Status'},{key:'ipk',label:'IPK'},

@@ -4,11 +4,12 @@
  */
 
 import { DB } from '../data/seed.js';
-import { AppState } from '../state.js';
+import { AppState } from '../state.js?v=20261025ab';
 import { formatDate, formatDateTime, generateId, statusBadge } from '../utils.js';
 import { showToast, showConfirm } from '../components/toast.js';
 import { openModal, openFormModal } from '../components/modal.js';
 import { DataTable } from '../components/data-table.js';
+import { scopeRows, scopeStudyPrograms } from '../campus-scope.js';
 
 const SEM_ID = 'sem-1';
 
@@ -145,8 +146,8 @@ function buildRequirements(student, policy, reg) {
     label: policy.periodOpen ? 'Terpenuhi' : 'Belum terpenuhi',
     tone: policy.periodOpen ? 'success' : 'danger',
     detail: policy.periodOpen
-      ? `Periode terbuka (${formatDate(policy.periodStart)} â€“ ${formatDate(policy.periodEnd)}).`
-      : `Periode ditutup (${formatDate(policy.periodStart)} â€“ ${formatDate(policy.periodEnd)}).`,
+      ? `Periode terbuka (${formatDate(policy.periodStart)} – ${formatDate(policy.periodEnd)}).`
+      : `Periode ditutup (${formatDate(policy.periodStart)} – ${formatDate(policy.periodEnd)}).`,
   };
   return [
     { id: 'academic', name: 'Status akademik Aktif', ...acad },
@@ -244,7 +245,7 @@ export function renderStudentRegistration(path, container) {
     <div class="card-body" style="display:flex;flex-wrap:wrap;gap:1.25rem;align-items:center;justify-content:space-between">
       <div>
         <div class="reg-identity-name">${esc(student.name)}</div>
-        <div class="reg-identity-sub">${esc(student.nim)} Â· ${esc(prodi?.name || '-')} Â· ${esc(campus?.code || '-')}</div>
+        <div class="reg-identity-sub">${esc(student.nim)} · ${esc(prodi?.name || '-')} · ${esc(campus?.code || '-')}</div>
         <div style="margin-top:0.5rem;display:flex;flex-wrap:wrap;gap:0.4rem">
           ${statusBadge(student.status)}
           <span class="badge badge-navy">Angkatan ${student.angkatan}</span>
@@ -254,7 +255,7 @@ export function renderStudentRegistration(path, container) {
       <div class="reg-context">
         <div class="reg-context-label">Semester aktif</div>
         <div class="reg-context-value">${esc(semester?.name || 'Ganjil 2026/2027')}</div>
-        <div class="reg-context-meta">Periode: ${formatDate(policy.periodStart)} â€“ ${formatDate(policy.periodEnd)}
+        <div class="reg-context-meta">Periode: ${formatDate(policy.periodStart)} – ${formatDate(policy.periodEnd)}
           ${policy.periodOpen ? '<span class="badge badge-success ms-1">Terbuka</span>' : '<span class="badge badge-danger ms-1">Ditutup</span>'}
         </div>
       </div>
@@ -384,7 +385,7 @@ function buildPrimaryButton(reg, policy, submitGate, fin) {
   if (!policy.periodOpen) {
     return {
       enabled: false,
-      reason: `Registrasi ditutup (${formatDate(policy.periodStart)} â€“ ${formatDate(policy.periodEnd)}).`,
+      reason: `Registrasi ditutup (${formatDate(policy.periodStart)} – ${formatDate(policy.periodEnd)}).`,
       html: `<button type="button" class="btn btn-secondary btn-block" disabled><i class="bi bi-lock"></i> Registrasi ditutup</button>`,
     };
   }
@@ -423,7 +424,7 @@ function bindStudentActions(container, student, reg, policy) {
     pushHistory(reg, from, 'Draft', 'Mahasiswa', 'Simpan draft');
     reg.status = 'Draft';
     saveReg(reg);
-    DB.log('Simpan Draft Registrasi', 'Registrasi Semester', `${student.nim} â†’ Draft`);
+    DB.log('Simpan Draft Registrasi', 'Registrasi Semester', `${student.nim} ? Draft`);
     showToast('Draft registrasi disimpan.', 'success');
     renderStudentRegistration('/portal/student/registration', container);
   });
@@ -459,7 +460,7 @@ function bindStudentActions(container, student, reg, policy) {
     fresh.submittedAt = new Date().toISOString();
     if (next === 'Teregistrasi') fresh.staffId = 'auto';
     saveReg(fresh);
-    DB.log('Ajukan Registrasi', 'Registrasi Semester', `${student.nim}: ${from} â†’ ${next}`);
+    DB.log('Ajukan Registrasi', 'Registrasi Semester', `${student.nim}: ${from} ? ${next}`);
     DB.addNotif('info', 'Registrasi diajukan', `Pengajuan registrasi ${student.nim} berstatus ${next}.`, '#/students/registration', ['baak', 'admin']);
     showToast(`Pengajuan berhasil. Status: ${next}.`, 'success');
     renderStudentRegistration('/portal/student/registration', container);
@@ -476,7 +477,7 @@ function renderHistoryPage(container, student, prodi, campus) {
   <div class="page-header">
     <div class="page-header-info">
       <h1 class="page-title">Riwayat Registrasi</h1>
-      <p class="page-desc">${esc(student.name)} Â· ${esc(student.nim)} Â· ${esc(prodi?.name || '-')}</p>
+      <p class="page-desc">${esc(student.name)} · ${esc(student.nim)} · ${esc(prodi?.name || '-')}</p>
     </div>
     <div class="page-actions">
       <a href="#/portal/student/registration" class="btn btn-secondary"><i class="bi bi-arrow-left"></i> Kembali</a>
@@ -520,9 +521,10 @@ function renderHistoryPage(container, student, prodi, campus) {
 export function renderStaffRegistration(path, container) {
   const policy = getPolicy();
   const semester = getSemester();
-  const regs = DB.getAll('semesterRegistrations');
-  const students = DB.getAll('students');
-  const studyPrograms = DB.getAll('studyPrograms');
+  const students = scopeRows(DB.getAll('students'));
+  const allowedStudentIds = new Set(students.map(item => item.id));
+  const regs = DB.getAll('semesterRegistrations').filter(item => allowedStudentIds.has(item.studentId));
+  const studyPrograms = scopeStudyPrograms(DB.getAll('studyPrograms'));
   const pending = regs.filter(r => r.status === 'Menunggu Validasi').length;
 
   container.innerHTML = `
@@ -530,7 +532,7 @@ export function renderStaffRegistration(path, container) {
   <div class="page-header">
     <div class="page-header-info">
       <h1 class="page-title">Registrasi Semester</h1>
-      <p class="page-desc">Antrean validasi Â· ${esc(semester?.name || 'Ganjil 2026/2027')} Â· ${pending} menunggu validasi</p>
+      <p class="page-desc">Antrean validasi · ${esc(semester?.name || 'Ganjil 2026/2027')} · ${pending} menunggu validasi</p>
     </div>
     <div class="page-actions">
       <button type="button" class="btn btn-secondary" id="reg-policy-btn"><i class="bi bi-sliders"></i> Kebijakan Demo</button>
@@ -689,7 +691,7 @@ function handleStaffAction(action, regId, container) {
       reg.status = 'Teregistrasi';
       reg.staffId = AppState.currentRole?.id || 'staff';
       saveReg(reg);
-      DB.log('Konfirmasi Registrasi', 'Registrasi Semester', `${student?.nim}: ${from} â†’ Teregistrasi`);
+      DB.log('Konfirmasi Registrasi', 'Registrasi Semester', `${student?.nim}: ${from} ? Teregistrasi`);
       DB.addNotif('success', 'Registrasi disetujui', `Registrasi semester Anda telah disetujui.`, '#/portal/student/registration', ['student']);
       showToast('Registrasi dikonfirmasi.', 'success');
       renderStaffRegistration('/students/registration', container);
@@ -710,7 +712,7 @@ function handleStaffAction(action, regId, container) {
         reg.note = data.note;
         reg.staffId = AppState.currentRole?.id || 'staff';
         saveReg(reg);
-        DB.log('Tolak Registrasi', 'Registrasi Semester', `${student?.nim}: ${from} â†’ Ditolak`);
+        DB.log('Tolak Registrasi', 'Registrasi Semester', `${student?.nim}: ${from} ? Ditolak`);
         DB.addNotif('warning', 'Registrasi ditolak', data.note, '#/portal/student/registration', ['student']);
         close();
         showToast('Registrasi ditolak.', 'warning');
@@ -740,7 +742,7 @@ function handleStaffAction(action, regId, container) {
         reg.status = 'Dibatalkan';
         reg.note = data.note;
         saveReg(reg);
-        DB.log('Batalkan Registrasi', 'Registrasi Semester', `${student?.nim}: ${from} â†’ Dibatalkan`);
+        DB.log('Batalkan Registrasi', 'Registrasi Semester', `${student?.nim}: ${from} ? Dibatalkan`);
         close();
         showToast('Registrasi dibatalkan.', 'warning');
         renderStaffRegistration('/students/registration', container);

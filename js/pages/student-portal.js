@@ -4,10 +4,11 @@
  */
 
 import { DB } from '../data/seed.js';
-import { AppState } from '../state.js';
+import { AppState } from '../state.js?v=20261025ab';
 import { formatRupiah, formatDate, formatDateTime, statusBadge } from '../utils.js';
 import { createBarChart } from '../components/charts.js';
-import { calcIpsLast, maxSksFromIps, getPolicy as getKrsPolicy } from './student-krs.js';
+import { calcIpsLast, maxSksFromIps, getPolicy as getKrsPolicy } from './student-krs.js?v=20261025aa';
+import { scopeRows, scopeStudyPrograms, scopeCampuses, scopeCourses } from '../campus-scope.js';
 
 function esc(s) {
   return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -15,7 +16,23 @@ function esc(s) {
 
 function getStudent() {
   const role = AppState.currentRole;
-  return DB.getAll('students').find(s => s.id === (role.studentId || 'stu-1'));
+  return scopeRows(DB.getAll('students')).find(s => s.id === (role.studentId || 'stu-1'));
+}
+
+function getVisiblePrograms() {
+  return scopeStudyPrograms(DB.getAll('studyPrograms'));
+}
+
+function getVisibleCampuses() {
+  return scopeCampuses(DB.getAll('campuses'));
+}
+
+function getVisibleCourses() {
+  return scopeCourses(DB.getAll('courses'), DB.getAll('studyPrograms'));
+}
+
+function getVisibleLecturers() {
+  return scopeRows(DB.getAll('lecturers'));
 }
 
 function getReg(studentId) {
@@ -70,7 +87,7 @@ function pageShell(title, desc, body, actions = '') {
 export function renderStudentPortalExtra(path, container) {
   const student = getStudent();
   if (!student) {
-    container.innerHTML = '<div class="page-container"><p>Data mahasiswa tidak ditemukan.</p></div>';
+    container.innerHTML = '<div class="page-container"><p>Data mahasiswa tidak ditemukan untuk kampus yang sedang dipilih.</p></div>';
     return;
   }
 
@@ -104,13 +121,13 @@ export function renderStudentPortalExtra(path, container) {
 export function renderStudentDashboard(container, student) {
   if (!student) student = getStudent();
   if (!student) {
-    container.innerHTML = '<div class="page-container"><p>Data mahasiswa tidak ditemukan.</p></div>';
+    container.innerHTML = '<div class="page-container"><p>Data mahasiswa tidak ditemukan untuk kampus yang sedang dipilih.</p></div>';
     return;
   }
 
-  const prodi = DB.getById('studyPrograms', student.prodiId);
-  const campus = DB.getById('campuses', student.campusId);
-  const advisor = DB.getById('lecturers', student.advisor);
+  const prodi = getVisiblePrograms().find(item => item.id === student.prodiId);
+  const campus = getVisibleCampuses().find(item => item.id === student.campusId);
+  const advisor = getVisibleLecturers().find(item => item.id === student.advisor);
   const reg = getReg(student.id);
   const plan = getPlan(student.id);
   const regPol = getRegPolicy();
@@ -138,7 +155,7 @@ export function renderStudentDashboard(container, student) {
     <div class="portal-header-avatar">${esc(student.name.charAt(0))}</div>
     <div class="portal-header-info">
       <div class="portal-header-name">${esc(student.name)}</div>
-      <div class="portal-header-sub">${esc(student.nim)} Â· ${esc(prodi?.name || '-')} Â· ${esc(campus?.code || '-')}</div>
+      <div class="portal-header-sub">${esc(student.nim)} · ${esc(prodi?.name || '-')} · ${esc(campus?.code || '-')}</div>
       <div class="portal-header-badges">
         ${statusBadge(student.status)}
         <span class="badge badge-gold">Semester ${student.semester}</span>
@@ -225,7 +242,7 @@ export function renderStudentDashboard(container, student) {
         <div class="card-body">
           ${nextClass ? `
             <div class="stat-row"><span class="stat-row-label">Mata kuliah</span><span class="stat-row-value">${esc(nextClass.name)}</span></div>
-            <div class="stat-row"><span class="stat-row-label">Waktu</span><span class="stat-row-value">${esc(nextClass.day)} ${esc(nextClass.startTime)}â€“${esc(nextClass.endTime)}</span></div>
+            <div class="stat-row"><span class="stat-row-label">Waktu</span><span class="stat-row-value">${esc(nextClass.day)} ${esc(nextClass.startTime)}–${esc(nextClass.endTime)}</span></div>
             <div class="stat-row"><span class="stat-row-label">Ruang</span><span class="stat-row-value">${esc(nextClass.room || '-')}</span></div>
           ` : `<div class="empty-state" style="padding:1rem"><div class="empty-state-desc">Belum ada jadwal dari KRS Disetujui/Final. <a href="#/portal/student/krs">Lihat KRS</a></div></div>`}
         </div>
@@ -234,8 +251,8 @@ export function renderStudentDashboard(container, student) {
       <div class="card">
         <div class="card-header"><h3 class="card-title">Batas waktu akademik</h3></div>
         <div class="card-body">
-          <div class="stat-row"><span class="stat-row-label">Registrasi</span><span class="stat-row-value">${formatDate(regPol.periodStart)} â€“ ${formatDate(regPol.periodEnd)}</span></div>
-          <div class="stat-row"><span class="stat-row-label">Pengisian KRS</span><span class="stat-row-value">${formatDate(semester?.krsStart)} â€“ ${formatDate(semester?.krsEnd)}</span></div>
+          <div class="stat-row"><span class="stat-row-label">Registrasi</span><span class="stat-row-value">${formatDate(regPol.periodStart)} – ${formatDate(regPol.periodEnd)}</span></div>
+          <div class="stat-row"><span class="stat-row-label">Pengisian KRS</span><span class="stat-row-value">${formatDate(semester?.krsStart)} – ${formatDate(semester?.krsEnd)}</span></div>
           <div class="stat-row"><span class="stat-row-label">Perubahan KRS</span><span class="stat-row-value">${krsPol.changePeriodOpen ? 'Terbuka (demo)' : 'Ditutup'}</span></div>
         </div>
       </div>
@@ -353,9 +370,9 @@ function buildQuickActions(reg, plan, regPol, krsPol) {
 // ===================== SUB PAGES =====================
 
 function renderProfile(container, student) {
-  const prodi = DB.getById('studyPrograms', student.prodiId);
-  const campus = DB.getById('campuses', student.campusId);
-  const advisor = DB.getById('lecturers', student.advisor);
+  const prodi = getVisiblePrograms().find(item => item.id === student.prodiId);
+  const campus = getVisibleCampuses().find(item => item.id === student.campusId);
+  const advisor = getVisibleLecturers().find(item => item.id === student.advisor);
   const body = `
 <div class="card">
   <div class="card-body">
@@ -382,7 +399,7 @@ function renderProfile(container, student) {
 
 function renderKhs(container, student) {
   const grades = DB.getAll('grades').filter(g => g.studentId === student.id && g.status === 'final');
-  const courses = DB.getAll('courses');
+  const courses = getVisibleCourses();
   const semesters = DB.getAll('semesters');
   const bySem = {};
   grades.forEach(g => {
@@ -432,7 +449,7 @@ function renderKhs(container, student) {
 
 function renderTranscript(container, student) {
   const grades = DB.getAll('grades').filter(g => g.studentId === student.id && g.status === 'final');
-  const courses = DB.getAll('courses');
+  const courses = getVisibleCourses();
   if (!grades.length) {
     container.innerHTML = emptyPage('Transkrip Nilai', 'Rekap nilai kumulatif', 'Belum ada nilai final untuk ditampilkan.');
     return;
@@ -510,9 +527,9 @@ ${note}
         ? '<div style="font-size:var(--text-xs);color:var(--color-muted);padding:0.5rem">Tidak ada kelas</div>'
         : schedule[d].map(cl => `
           <div class="schedule-class-card">
-            <div class="schedule-class-time">${esc(cl.startTime)}â€“${esc(cl.endTime)}</div>
+            <div class="schedule-class-time">${esc(cl.startTime)}–${esc(cl.endTime)}</div>
             <div class="schedule-class-name">${esc(cl.name)}</div>
-            <div class="schedule-class-meta">${esc(cl.classCode || '')} Â· ${esc(cl.room || '-')} Â· ${cl.sks || 0} SKS</div>
+            <div class="schedule-class-meta">${esc(cl.classCode || '')} · ${esc(cl.room || '-')} · ${cl.sks || 0} SKS</div>
           </div>`).join('')}
     </div>`).join('')}
 </div>`;
@@ -542,7 +559,7 @@ function renderCalendar(container, student) {
 }
 
 function renderAdvisor(container, student) {
-  const advisor = DB.getById('lecturers', student.advisor);
+  const advisor = getVisibleLecturers().find(item => item.id === student.advisor);
   const plan = getPlan(student.id);
   const plans = DB.getAll('krsPlans').filter(p => p.studentId === student.id);
 
@@ -588,7 +605,7 @@ function renderAdvisor(container, student) {
       </div>
     </div>
     <div class="info-box" style="margin-top:1rem">
-      <i class="bi bi-calendar3"></i> Jadwal konsultasi demo: Senin 13:00â€“15:00 (simulasi).
+      <i class="bi bi-calendar3"></i> Jadwal konsultasi demo: Senin 13:00–15:00 (simulasi).
     </div>
   </div>
 </div>`;
@@ -691,7 +708,7 @@ function renderAnnouncements(container) {
       <div class="notif-item">
         <div class="notif-body">
           <div class="notif-text"><strong>${esc(e.event)}</strong><br>Jenis: ${esc(e.type)}</div>
-          <div class="notif-time">${formatDate(e.startDate)}${e.endDate && e.endDate !== e.startDate ? ` â€“ ${formatDate(e.endDate)}` : ''}</div>
+          <div class="notif-time">${formatDate(e.startDate)}${e.endDate && e.endDate !== e.startDate ? ` – ${formatDate(e.endDate)}` : ''}</div>
         </div>
       </div>`).join('')}
   </div>

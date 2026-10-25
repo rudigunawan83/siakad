@@ -124,3 +124,87 @@ export const assignmentSubmissions = [
   { id: 'asub-3', assignmentId: 'cass-2', studentId: 'stu-1', submittedAt: '2026-10-19T18:00:00', status: 'Tepat waktu', score: null },
   { id: 'asub-4', assignmentId: 'cass-3', studentId: 'stu-1', submittedAt: '2026-10-07T12:00:00', status: 'Tepat waktu', score: 90 },
 ];
+
+export const lectureMaterials = [
+  {
+    id: 'lmat-1', lecturerId: 'lec-1', classId: 'cls-3', meeting: 1,
+    title: 'Pengantar Kecerdasan Buatan', kind: 'Slide',
+    description: 'Definisi AI, sejarah singkat, dan peta cabang.',
+    fileName: 'TIF302-p01-pengantar.pdf', sizeKb: 420, type: 'application/pdf',
+    status: 'Dipublikasikan',
+  },
+  {
+    id: 'lmat-2', lecturerId: 'lec-1', classId: 'cls-3', meeting: 2,
+    title: 'Pencarian Heuristik', kind: 'Modul',
+    description: 'A*, greedy, dan latihan graf.',
+    fileName: 'TIF302-p02-heuristic.pdf', sizeKb: 310, type: 'application/pdf',
+    status: 'Dipublikasikan',
+  },
+  {
+    id: 'lmat-3', lecturerId: 'lec-1', classId: 'cls-10', meeting: 1,
+    title: 'Metodologi riset ML', kind: 'Slide',
+    description: 'Perumusan masalah dan dataset.',
+    fileName: 'TIF401-p01-riset.pptx', sizeKb: 890,
+    type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    status: 'Draft',
+  },
+];
+
+export const lectureJournals = [
+  {
+    id: 'ljrn-1', lecturerId: 'lec-1', classId: 'cls-3', meeting: 1,
+    date: '2026-09-16', topic: 'Pengantar AI', outcome: 'Mahasiswa mampu membedakan AI lemah dan kuat.',
+    status: 'Terisi',
+  },
+  {
+    id: 'ljrn-2', lecturerId: 'lec-1', classId: 'cls-3', meeting: 2,
+    date: '2026-09-23', topic: 'Pencarian heuristik', outcome: 'Latihan A* di papan.',
+    status: 'Terisi',
+  },
+];
+
+export const lectureExams = [
+  {
+    id: 'lexm-1', lecturerId: 'lec-1', classId: 'cls-3', type: 'UTS',
+    date: '2026-11-10', startTime: '13:00', endTime: '15:00', room: 'Ruang 301',
+    minutes: '',
+  },
+];
+
+export const scheduleReplacements = [
+  {
+    id: 'srep-1', lecturerId: 'lec-1', classId: 'cls-3',
+    originalDate: '2026-10-28', originalTime: '13:00–15:30',
+    proposedDate: '2026-10-30', proposedTime: '08:00–10:30', proposedRoom: 'Lab AI',
+    reason: 'Mengikuti rapat kurikulum fakultas.',
+    status: 'Diajukan', createdAt: '2026-10-20T09:00:00',
+  },
+];
+
+export const gradeComponents = [
+  {
+    id: 'gcmp-1', classId: 'cls-3',
+    items: [
+      { key: 'tugas', label: 'Tugas', weight: 20 },
+      { key: 'kuis', label: 'Kuis', weight: 10 },
+      { key: 'praktikum', label: 'Praktikum', weight: 15 },
+      { key: 'uts', label: 'UTS', weight: 25 },
+      { key: 'uas', label: 'UAS', weight: 30 },
+    ],
+  },
+];
+
+export const thesisNotes = [
+  {
+    id: 'thn-1', thesisId: 'ths-1', lecturerId: 'lec-1',
+    date: '2026-10-08', notes: 'Perbaiki rumusan masalah BAB I.', followUp: 'Kirim revisi minggu depan',
+  },
+];
+
+export const lectureDefenses = [
+  {
+    id: 'ldef-1', lecturerId: 'lec-1', thesisId: 'ths-1', role: 'Pembimbing',
+    date: '2026-12-05', time: '09:00', room: 'Ruang Sidang 1',
+    status: 'Terjadwal', decision: null, minutes: '',
+  },
+];

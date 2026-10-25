@@ -1,34 +1,53 @@
 /**
- * SIAKAD — Portal Dosen (design.md bagian 9)
- * 17 menu; LEC-031–037 di lecturer-ops.js
+ * SIAKAD � Portal Dosen (design.md bagian 9)
+ * 17 menu; LEC-031�037 di lecturer-ops.js
  */
 import { DB } from '../data/seed.js';
-import { AppState } from '../state.js';
+import { AppState } from '../state.js?v=20261025ab';
 import { formatDate, statusBadge } from '../utils.js';
-import { showToast } from '../components/toast.js';
-import { renderAdvisorKrsApproval, countPendingForAdvisor } from './krs-approval.js';
+import { scopeRows, scopeStudyPrograms, scopeCampuses, scopeCourses } from '../campus-scope.js';
+import { renderAdvisorKrsApproval, countPendingForAdvisor } from './krs-approval.js?v=20261025z';
 import {
   getLecturerClasses as getAssignedClasses,
+  getOfficialRoster,
+  getActiveAdvisees,
   buildAcademicAdvisorPage,
   buildAdvisingPage,
   buildAnnouncementsPage,
   buildReportsPage,
   buildAdministrationPage,
   bindLecturerOps,
-} from './lecturer-ops.js';
+} from './lecturer-ops.js?v=20261025ab';
+import {
+  buildCoursesPage,
+  buildSchedulePage,
+  buildMaterialsPage,
+  buildAssignmentsPage,
+  buildGradingPage,
+  buildAttendancePage,
+  buildJournalPage,
+  buildExamPage,
+  buildThesisPage,
+  buildExaminationPage,
+  bindLecturerTeaching,
+} from './lecturer-teaching.js?v=20261025ab';
 
-/* ── helpers ──────────────────────────────────────── */
+/* -- helpers ---------------------------------------- */
 function getLecturer() {
   const role = AppState.currentRole;
-  return DB.getAll('lecturers').find(l => l.id === (role.lecturerId || 'lec-1'));
+  return scopeRows(DB.getAll('lecturers')).find(l => l.id === (role.lecturerId || 'lec-1'));
 }
 function getLecturerClasses(lecId) { return getAssignedClasses(lecId); }
-function courseName(courseId) { return DB.getAll('courses').find(c => c.id === courseId)?.name || '-'; }
-function courseObj(courseId) { return DB.getAll('courses').find(c => c.id === courseId); }
-function prodiName(prodiId) { return DB.getAll('studyPrograms').find(p => p.id === prodiId)?.name || '-'; }
-function campusName(campusId) { return DB.getAll('campuses').find(c => c.id === campusId)?.name || '-'; }
+function courseObj(courseId) { return scopeCourses(DB.getAll('courses'), DB.getAll('studyPrograms')).find(c => c.id === courseId); }
+function prodiName(prodiId) { return scopeStudyPrograms(DB.getAll('studyPrograms')).find(p => p.id === prodiId)?.name || '-'; }
+function campusName(campusId) { return scopeCampuses(DB.getAll('campuses')).find(c => c.id === campusId)?.name || '-'; }
+function scopedStudents() { return scopeRows(DB.getAll('students')); }
+function studentsForClass(cl) {
+  const studentMap = new Map(scopedStudents().map(item => [item.id, item]));
+  return getOfficialRoster(cl.id).map(item => studentMap.get(item.studentId)).filter(Boolean);
+}
 
-/* ── main entry ──────────────────────────────────── */
+/* -- main entry ------------------------------------ */
 export function renderLecturerPortal(path, container) {
   // Sub-routes
   if (path.includes('/advising/krs') || path.includes('/portal/lecturer/krs'))
@@ -40,10 +59,10 @@ export function renderLecturerPortal(path, container) {
     container.innerHTML = `
 <div class="page-container">
   <div class="empty-state" style="padding:2.5rem 1rem;text-align:center">
-    <div class="empty-state-title">${hasAny ? 'Profil dosen tidak cocok dengan peran aktif' : 'Data demo belum tersedia di perangkat ini'}</div>
+    <div class="empty-state-title">${hasAny ? 'Profil dosen tidak cocok dengan peran atau kampus aktif' : 'Data demo belum tersedia di perangkat ini'}</div>
     <p class="text-muted" style="max-width:28rem;margin:0.75rem auto 1.25rem">
       ${hasAny
-        ? 'Ganti peran di pojok kanan atas ke <strong>Dosen</strong>.'
+        ? 'Ganti peran di pojok kanan atas ke <strong>Dosen</strong> atau sesuaikan filter kampus di header.'
         : 'Prototype menyimpan data di localStorage browser HP (bukan server). Storage kosong/rusak sering terjadi di mode privat, browser dalam aplikasi (WhatsApp/Instagram), atau kuota penuh.'}
     </p>
     <button type="button" class="btn btn-primary" id="lec-reseed-btn">
@@ -52,7 +71,7 @@ export function renderLecturerPortal(path, container) {
   </div>
 </div>`;
     container.querySelector('#lec-reseed-btn')?.addEventListener('click', async () => {
-      const { initSeed } = await import('../data/seed.js');
+      const { initSeed } = await import('../data/seed.js?v=20261025ak');
       initSeed(true);
       location.reload();
     });
@@ -63,7 +82,7 @@ export function renderLecturerPortal(path, container) {
   const sub = path.replace('/portal/lecturer', '').replace(/^\//, '') || 'dashboard';
   const page = sub.split('/')[0];
 
-  // Nav 17 menu ada di sidebar shell kiri (sidebar.js) — hindari sidebar ganda
+  // Nav 17 menu ada di sidebar shell kiri (sidebar.js) � hindari sidebar ganda
   const content = buildPageContent(page, sub, lecturer);
 
   container.innerHTML = `
@@ -73,24 +92,26 @@ export function renderLecturerPortal(path, container) {
 
   if (page === 'dashboard') initDashboardCharts(lecturer);
   bindLecturerOps(lecturer);
+  bindLecturerTeaching(lecturer);
 }
 
-/* ── page router ─────────────────────────────────── */
+/* -- page router ----------------------------------- */
 function buildPageContent(page, sub, lecturer) {
   const classes = getLecturerClasses(lecturer.id);
+  const rest = sub.split('/').slice(1).filter(Boolean);
   switch (page) {
     case 'dashboard': return buildDashboard(lecturer, classes);
-    case 'courses': return buildCourses(lecturer, classes, sub);
-    case 'schedule': return buildSchedule(lecturer, classes);
-    case 'materials': return buildMaterials(lecturer, classes);
-    case 'assignments': return buildAssignments(lecturer, classes);
-    case 'grading': return buildGrading(lecturer, classes);
-    case 'attendance': return buildAttendance(lecturer, classes);
-    case 'journal': return buildJournal(lecturer, classes);
-    case 'exam': return buildExam(lecturer, classes);
+    case 'courses': return buildCoursesPage(lecturer, classes, rest);
+    case 'schedule': return buildSchedulePage(lecturer, classes, rest);
+    case 'materials': return buildMaterialsPage(lecturer, classes, rest);
+    case 'assignments': return buildAssignmentsPage(lecturer, classes, rest);
+    case 'grading': return buildGradingPage(lecturer, classes, rest);
+    case 'attendance': return buildAttendancePage(lecturer, classes, rest);
+    case 'journal': return buildJournalPage(lecturer, classes, rest);
+    case 'exam': return buildExamPage(lecturer, classes);
     case 'advising': return buildAdvisingPage(lecturer);
-    case 'thesis': return buildThesis(lecturer);
-    case 'examination': return buildExamination(lecturer);
+    case 'thesis': return buildThesisPage(lecturer, rest);
+    case 'examination': return buildExaminationPage(lecturer, rest);
     case 'academic-advisor': return buildAcademicAdvisorPage(lecturer);
     case 'announcements': return buildAnnouncementsPage(lecturer, classes);
     case 'reports': return buildReportsPage(lecturer, classes);
@@ -100,17 +121,26 @@ function buildPageContent(page, sub, lecturer) {
   }
 }
 
-/* ══════════════════════════════════════════════════
+/* --------------------------------------------------
    1. DASHBOARD (9.0.1)
-   ══════════════════════════════════════════════════ */
+   -------------------------------------------------- */
 function buildDashboard(lecturer, classes) {
   const campus = campusName(lecturer.campusId);
   const totalMhs = classes.reduce((s, c) => s + (c.enrolled || 0), 0);
-  const theses = DB.getAll('theses').filter(t => t.supervisorId === lecturer.id);
+  const theses = scopeRows(DB.getAll('theses')).filter(t => t.supervisorId === lecturer.id);
   const pendingKRS = countPendingForAdvisor(lecturer.id);
-  const grades = DB.getAll('grades').filter(g => classes.some(cl => cl.courseId === g.courseId) && g.lecturerId === lecturer.id);
+  const pendingAssignments = DB.getAll('classAssignments').filter(a =>
+    a.lecturerId === lecturer.id && classes.some(cl => cl.id === a.classId)
+  ).filter(a => {
+    const roster = studentsForClass(classes.find(cl => cl.id === a.classId) || { id: a.classId }).length;
+    const graded = DB.getAll('assignmentSubmissions').filter(s => s.assignmentId === a.id && s.score != null).length;
+    return graded < roster;
+  }).length;
+  const filledJournals = DB.getAll('lectureJournals').filter(j => j.lecturerId === lecturer.id && j.status === 'Terisi').length;
+  const expectedJournals = Math.max(classes.length * 4, filledJournals);
   const unfinalGrades = classes.filter(cl => {
-    const gs = DB.getAll('grades').filter(g => g.courseId === cl.courseId);
+    const rosterStudentIds = new Set(studentsForClass(cl).map(item => item.id));
+    const gs = DB.getAll('grades').filter(g => rosterStudentIds.has(g.studentId) && g.courseId === cl.courseId);
     return gs.length === 0 || gs.some(g => g.status !== 'final');
   });
 
@@ -159,7 +189,7 @@ function buildDashboard(lecturer, classes) {
       </a>
       <a href="#/portal/lecturer/assignments" class="lec-kpi-card kpi-warning">
         <div class="lec-kpi-icon"><i class="bi bi-clipboard-check"></i></div>
-        <div class="lec-kpi-val">${classes.length * 2}</div>
+        <div class="lec-kpi-val">${pendingAssignments}</div>
         <div class="lec-kpi-label">Tugas Belum Dinilai</div>
       </a>
       <a href="#/portal/lecturer/grading" class="lec-kpi-card kpi-danger">
@@ -174,7 +204,7 @@ function buildDashboard(lecturer, classes) {
       </a>
       <a href="#/portal/lecturer/journal" class="lec-kpi-card kpi-warning">
         <div class="lec-kpi-icon"><i class="bi bi-journal-text"></i></div>
-        <div class="lec-kpi-val">${classes.length * 2}</div>
+        <div class="lec-kpi-val">${Math.max(0, expectedJournals - filledJournals)}</div>
         <div class="lec-kpi-label">Jurnal Belum Diisi</div>
       </a>
     </div>
@@ -190,7 +220,7 @@ function buildDashboard(lecturer, classes) {
     <div class="lec-grid-2">
       <!-- Today's Schedule -->
       <div class="card">
-        <div class="card-header"><h3 class="card-title"><i class="bi bi-calendar-day"></i> Jadwal Hari Ini — ${today}</h3></div>
+        <div class="card-header"><h3 class="card-title"><i class="bi bi-calendar-day"></i> Jadwal Hari Ini � ${today}</h3></div>
         <div class="card-body">
           ${todayClasses.length === 0
             ? '<div class="empty-state" style="padding:1rem"><div class="empty-state-desc">Tidak ada kelas hari ini</div></div>'
@@ -222,7 +252,7 @@ function buildDashboard(lecturer, classes) {
               <span class="bimbingan-label">Bimbingan TA</span>
             </div>
             <div class="bimbingan-stat">
-              <span class="bimbingan-val">${DB.getAll('advisorAssignments').filter(a => a.lecturerId === lecturer.id && a.status === 'aktif').length}</span>
+              <span class="bimbingan-val">${getActiveAdvisees(lecturer.id).length}</span>
               <span class="bimbingan-label">Mhs. Wali</span>
             </div>
           </div>
@@ -238,7 +268,7 @@ function buildDashboard(lecturer, classes) {
     <div class="card" style="margin-top:1rem">
       <div class="card-header"><h3 class="card-title"><i class="bi bi-megaphone"></i> Pengumuman Terbaru</h3></div>
       <div class="card-body">
-        ${DB.getAll('notifications').filter(n => n.role?.includes('Dosen')).slice(0, 3).map(n => `
+        ${scopeRows(DB.getAll('notifications')).filter(n => n.role?.includes('Dosen')).slice(0, 3).map(n => `
           <div class="notif-row">
             <div><strong>${n.title}</strong><br><small class="text-muted">${n.message}</small></div>
             <small class="text-muted">${formatDate(n.time)}</small>
@@ -250,441 +280,10 @@ function buildDashboard(lecturer, classes) {
 
 function initDashboardCharts() { /* Chart.js init if needed */ }
 
-/* ══════════════════════════════════════════════════
-   2. MATA KULIAH SAYA (9.0.2)
-   ══════════════════════════════════════════════════ */
-function buildCourses(lecturer, classes, sub) {
-  // Group by course
-  const courseMap = {};
-  classes.forEach(cl => {
-    const co = courseObj(cl.courseId);
-    if (!co) return;
-    if (!courseMap[co.id]) courseMap[co.id] = { course: co, classes: [] };
-    courseMap[co.id].classes.push(cl);
-  });
-  const courseList = Object.values(courseMap);
 
-  return `
-  <div class="lec-page">
-    <div class="lec-page-header">
-      <h2><i class="bi bi-book"></i> Mata Kuliah Saya</h2>
-      <span class="text-muted">Semester Ganjil 2026/2027</span>
-    </div>
-    <div class="card">
-      <div class="scroll-x">
-        <table class="data-table">
-          <thead><tr>
-            <th>Kode</th><th>Mata Kuliah</th><th>SKS</th><th>Program Studi</th>
-            <th>Jumlah Kelas</th><th>Total Mahasiswa</th><th>Status</th>
-          </tr></thead>
-          <tbody>
-            ${courseList.map(({ course: co, classes: cls }) => `
-            <tr>
-              <td><code>${co.code}</code></td>
-              <td><strong>${co.name}</strong></td>
-              <td>${co.sks}</td>
-              <td>${prodiName(co.prodiId)}</td>
-              <td>${cls.length}</td>
-              <td>${cls.reduce((s, c) => s + c.enrolled, 0)}</td>
-              <td>${statusBadge(co.status)}</td>
-            </tr>`).join('')}
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <h3 style="margin-top:1.5rem;font-size:1rem"><i class="bi bi-collection"></i> Daftar Kelas</h3>
-    <div class="card">
-      <div class="scroll-x">
-        <table class="data-table">
-          <thead><tr>
-            <th>Kode Kelas</th><th>Mata Kuliah</th><th>Hari & Jam</th><th>Ruang</th>
-            <th>Peserta</th><th>Status</th><th>Aksi</th>
-          </tr></thead>
-          <tbody>
-            ${classes.map(cl => {
-              const co = courseObj(cl.courseId);
-              return `
-              <tr>
-                <td><strong>${cl.code}</strong></td>
-                <td>${co?.name || '-'} <span class="badge badge-info">${co?.sks || 0} SKS</span></td>
-                <td>${cl.day}, ${cl.startTime}–${cl.endTime}</td>
-                <td>${cl.room}</td>
-                <td><strong>${cl.enrolled}</strong>/${cl.capacity}</td>
-                <td>${statusBadge(cl.status)}</td>
-                <td>
-                  <button class="btn btn-secondary btn-sm" onclick="showToast('Detail kelas ${cl.code}','info')"><i class="bi bi-eye"></i></button>
-                  <a href="#/portal/lecturer/attendance" class="btn btn-secondary btn-sm"><i class="bi bi-check2-square"></i></a>
-                  <a href="#/portal/lecturer/grading" class="btn btn-secondary btn-sm"><i class="bi bi-bar-chart-line"></i></a>
-                </td>
-              </tr>`;
-            }).join('')}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>`;
-}
-
-/* ══════════════════════════════════════════════════
-   3. JADWAL MENGAJAR (9.0.3)
-   ══════════════════════════════════════════════════ */
-function buildSchedule(lecturer, classes) {
-  const days = ['Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
-  const todayIdx = new Date().getDay();
-  const todayName = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'][todayIdx];
-
-  return `
-  <div class="lec-page">
-    <div class="lec-page-header">
-      <h2><i class="bi bi-calendar3"></i> Jadwal Mengajar</h2>
-    </div>
-    <div class="card">
-      <div class="card-header"><h3 class="card-title">Jadwal Mingguan</h3></div>
-      <div class="card-body">
-        <div class="weekly-schedule">
-          ${days.map(d => {
-            const dayClasses = classes.filter(c => c.day === d);
-            return `
-            <div class="schedule-day-col ${d === todayName ? 'today' : ''}">
-              <div class="schedule-day-header">${d} ${d === todayName ? '<span class="badge badge-gold">Hari Ini</span>' : ''}</div>
-              ${dayClasses.length === 0
-                ? '<div class="schedule-empty">—</div>'
-                : dayClasses.sort((a,b) => a.startTime.localeCompare(b.startTime)).map(cl => {
-                  const co = courseObj(cl.courseId);
-                  return `
-                  <div class="schedule-block">
-                    <div class="schedule-block-time">${cl.startTime} – ${cl.endTime}</div>
-                    <div class="schedule-block-course">${co?.name || '-'}</div>
-                    <div class="schedule-block-meta">${cl.code} · ${cl.room}</div>
-                    <div class="schedule-block-meta">${cl.enrolled}/${cl.capacity} mhs</div>
-                  </div>`;
-                }).join('')}
-            </div>`;
-          }).join('')}
-        </div>
-      </div>
-    </div>
-
-    <!-- Pengajuan Jadwal Pengganti -->
-    <div class="card" style="margin-top:1rem">
-      <div class="card-header">
-        <h3 class="card-title"><i class="bi bi-arrow-repeat"></i> Pengajuan Jadwal Pengganti</h3>
-        <button class="btn btn-primary btn-sm" onclick="showToast('Form pengajuan jadwal pengganti akan tersedia di versi lengkap.','info')"><i class="bi bi-plus"></i> Ajukan</button>
-      </div>
-      <div class="card-body">
-        <div class="empty-state" style="padding:1rem"><div class="empty-state-desc">Belum ada pengajuan jadwal pengganti.</div></div>
-      </div>
-    </div>
-  </div>`;
-}
-
-/* ══════════════════════════════════════════════════
-   4. MATERI & MODUL (9.0.4)
-   ══════════════════════════════════════════════════ */
-function buildMaterials(lecturer, classes) {
-  return `
-  <div class="lec-page">
-    <div class="lec-page-header">
-      <h2><i class="bi bi-folder2-open"></i> Materi & Modul</h2>
-      <button class="btn btn-primary btn-sm" onclick="showToast('Form upload materi — pada prototype hanya metadata yang disimpan (LEC-014).','info')"><i class="bi bi-upload"></i> Upload Materi</button>
-    </div>
-    <div class="info-box" style="margin-bottom:1rem"><i class="bi bi-info-circle"></i> <strong>Batasan prototype:</strong> File tidak disimpan sebagai base64 di localStorage. Hanya metadata yang disimpan. Pada produksi, file disimpan di object storage (S3/GCS/Azure Blob) dengan signed URL dan enkripsi.</div>
-    ${classes.map(cl => {
-      const co = courseObj(cl.courseId);
-      return `
-      <div class="card" style="margin-bottom:1rem">
-        <div class="card-header"><h3 class="card-title">${co?.name || '-'} — ${cl.code}</h3></div>
-        <div class="scroll-x">
-          <table class="data-table">
-            <thead><tr><th>Pertemuan</th><th>Judul</th><th>Jenis</th><th>Status</th><th>Aksi</th></tr></thead>
-            <tbody>
-              ${[1,2,3].map(i => `
-              <tr>
-                <td>Pertemuan ${i}</td>
-                <td>${i === 1 ? 'RPS ' + (co?.name || '') : i === 2 ? 'Modul ' + i : 'Slide Presentasi ' + i}</td>
-                <td><span class="badge badge-info">${i === 1 ? 'RPS' : i === 2 ? 'Modul' : 'Slide'}</span></td>
-                <td>${statusBadge(i <= 2 ? 'dipublikasikan' : 'draft')}</td>
-                <td>
-                  <button class="btn btn-secondary btn-sm" onclick="showToast('Preview materi (simulasi)','info')"><i class="bi bi-eye"></i></button>
-                  <button class="btn btn-secondary btn-sm" onclick="showToast('Edit materi (simulasi)','info')"><i class="bi bi-pencil"></i></button>
-                </td>
-              </tr>`).join('')}
-            </tbody>
-          </table>
-        </div>
-      </div>`;
-    }).join('')}
-  </div>`;
-}
-
-/* ══════════════════════════════════════════════════
-   5. TUGAS & KUIS (9.0.5)
-   ══════════════════════════════════════════════════ */
-function buildAssignments(lecturer, classes) {
-  const demoAssignments = classes.flatMap(cl => {
-    const co = courseObj(cl.courseId);
-    return [
-      { id: `asg-${cl.id}-1`, title: `Tugas 1 - ${co?.name}`, classCode: cl.code, courseName: co?.name, deadline: '2026-11-15', submitted: Math.floor(cl.enrolled * 0.7), total: cl.enrolled, graded: Math.floor(cl.enrolled * 0.3), status: 'Dipublikasikan' },
-      { id: `asg-${cl.id}-2`, title: `Kuis 1 - ${co?.name}`, classCode: cl.code, courseName: co?.name, deadline: '2026-11-20', submitted: Math.floor(cl.enrolled * 0.5), total: cl.enrolled, graded: 0, status: 'Draft' },
-    ];
-  });
-
-  return `
-  <div class="lec-page">
-    <div class="lec-page-header">
-      <h2><i class="bi bi-clipboard-check"></i> Tugas & Kuis</h2>
-      <button class="btn btn-primary btn-sm" onclick="showToast('Form buat tugas baru akan tersedia.','info')"><i class="bi bi-plus"></i> Buat Tugas</button>
-    </div>
-    <div class="card">
-      <div class="scroll-x">
-        <table class="data-table">
-          <thead><tr>
-            <th>Judul</th><th>Kelas</th><th>Deadline</th><th>Pengumpulan</th><th>Dinilai</th><th>Status</th><th>Aksi</th>
-          </tr></thead>
-          <tbody>
-            ${demoAssignments.map(a => `
-            <tr>
-              <td><strong>${a.title}</strong></td>
-              <td>${a.classCode}</td>
-              <td>${formatDate(a.deadline)}</td>
-              <td>${a.submitted}/${a.total}</td>
-              <td>${a.graded}/${a.submitted}</td>
-              <td>${statusBadge(a.status)}</td>
-              <td>
-                <button class="btn btn-secondary btn-sm" onclick="showToast('Lihat pengumpulan (simulasi)','info')"><i class="bi bi-eye"></i></button>
-                <button class="btn btn-primary btn-sm" onclick="showToast('Mulai penilaian (simulasi)','info')"><i class="bi bi-pencil"></i> Nilai</button>
-              </td>
-            </tr>`).join('')}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>`;
-}
-
-/* ══════════════════════════════════════════════════
-   6. PENILAIAN (9.0.6)
-   ══════════════════════════════════════════════════ */
-function buildGrading(lecturer, classes) {
-  const components = ['Tugas (20%)', 'Kuis (10%)', 'Praktikum (15%)', 'UTS (25%)', 'UAS (30%)'];
-
-  return `
-  <div class="lec-page">
-    <div class="lec-page-header">
-      <h2><i class="bi bi-bar-chart-line"></i> Penilaian</h2>
-    </div>
-    <div class="info-box" style="margin-bottom:1rem"><i class="bi bi-info-circle"></i> Bobot penilaian per mata kuliah dapat dikonfigurasi. Jangan hardcode bobot secara global (LEC-019). Total bobot harus 100%.</div>
-
-    ${classes.map(cl => {
-      const co = courseObj(cl.courseId);
-      const students = DB.getAll('students').filter(s => s.prodiId === cl.prodiId).slice(0, 5);
-      return `
-      <div class="card" style="margin-bottom:1rem">
-        <div class="card-header">
-          <h3 class="card-title">${co?.name || '-'} — ${cl.code}</h3>
-          <div style="display:flex;gap:0.5rem">
-            <button class="btn btn-secondary btn-sm" onclick="showToast('Pengaturan komponen & bobot','info')"><i class="bi bi-gear"></i> Komponen</button>
-            <button class="btn btn-primary btn-sm" onclick="showToast('Nilai disimpan sebagai draft (simulasi).','gold')"><i class="bi bi-save"></i> Simpan Draft</button>
-            <button class="btn btn-accent btn-sm" onclick="if(confirm('Finalisasi nilai ${cl.code}?')) showToast('Nilai ${cl.code} telah difinalisasi (simulasi).','gold')"><i class="bi bi-lock"></i> Finalisasi</button>
-          </div>
-        </div>
-        <div class="card-body">
-          <div class="text-muted mb-2" style="font-size:0.8rem">Komponen: ${components.join(' · ')}</div>
-        </div>
-        <div class="scroll-x">
-          <table class="data-table">
-            <thead><tr><th>NIM</th><th>Nama</th><th>Tugas</th><th>Kuis</th><th>Praktikum</th><th>UTS</th><th>UAS</th><th>Nilai Akhir</th><th>Huruf</th></tr></thead>
-            <tbody>
-              ${students.map(s => {
-                const t = 70+Math.floor(Math.random()*20), k = 65+Math.floor(Math.random()*25),
-                      p = 70+Math.floor(Math.random()*20), u = 60+Math.floor(Math.random()*30),
-                      f = 55+Math.floor(Math.random()*35);
-                const na = (t*0.2 + k*0.1 + p*0.15 + u*0.25 + f*0.3).toFixed(1);
-                const huruf = na >= 85 ? 'A' : na >= 80 ? 'A-' : na >= 75 ? 'B+' : na >= 70 ? 'B' : na >= 65 ? 'B-' : na >= 60 ? 'C+' : na >= 55 ? 'C' : 'D';
-                return `<tr>
-                  <td><code>${s.nim}</code></td><td>${s.name}</td>
-                  <td><input type="number" class="form-control form-control-sm" value="${t}" min="0" max="100" style="width:60px"></td>
-                  <td><input type="number" class="form-control form-control-sm" value="${k}" min="0" max="100" style="width:60px"></td>
-                  <td><input type="number" class="form-control form-control-sm" value="${p}" min="0" max="100" style="width:60px"></td>
-                  <td><input type="number" class="form-control form-control-sm" value="${u}" min="0" max="100" style="width:60px"></td>
-                  <td><input type="number" class="form-control form-control-sm" value="${f}" min="0" max="100" style="width:60px"></td>
-                  <td><strong>${na}</strong></td>
-                  <td><span class="badge badge-${parseFloat(na)>=70?'success':'danger'}">${huruf}</span></td>
-                </tr>`;
-              }).join('')}
-            </tbody>
-          </table>
-        </div>
-      </div>`;
-    }).join('')}
-  </div>`;
-}
-
-/* ══════════════════════════════════════════════════
-   7. PRESENSI (9.0.7)
-   ══════════════════════════════════════════════════ */
-function buildAttendance(lecturer, classes) {
-  return `
-  <div class="lec-page">
-    <div class="lec-page-header">
-      <h2><i class="bi bi-check2-square"></i> Presensi Mahasiswa</h2>
-    </div>
-    ${classes.map(cl => {
-      const co = courseObj(cl.courseId);
-      const students = DB.getAll('students').filter(s => s.prodiId === cl.prodiId).slice(0, 5);
-      return `
-      <div class="card" style="margin-bottom:1rem">
-        <div class="card-header">
-          <h3 class="card-title">${co?.name || '-'} — ${cl.code}</h3>
-          <div style="display:flex;gap:0.5rem">
-            <select class="form-select form-select-sm" style="width:auto"><option>Pertemuan 1</option><option>Pertemuan 2</option><option selected>Pertemuan 3</option></select>
-            <button class="btn btn-primary btn-sm" onclick="showToast('Presensi ${cl.code} disimpan (simulasi).','gold')"><i class="bi bi-save"></i> Simpan</button>
-          </div>
-        </div>
-        <div class="scroll-x">
-          <table class="data-table">
-            <thead><tr><th>NIM</th><th>Nama</th><th>Status</th><th>Kehadiran</th></tr></thead>
-            <tbody>
-              ${students.map(s => {
-                const pct = 75 + Math.floor(Math.random() * 25);
-                return `<tr>
-                  <td><code>${s.nim}</code></td><td>${s.name}</td>
-                  <td>
-                    <div class="btn-group btn-group-sm">
-                      <button class="btn btn-success btn-sm active">H</button>
-                      <button class="btn btn-outline-secondary btn-sm">I</button>
-                      <button class="btn btn-outline-secondary btn-sm">S</button>
-                      <button class="btn btn-outline-secondary btn-sm">A</button>
-                    </div>
-                  </td>
-                  <td><div class="progress" style="height:6px;width:80px"><div class="progress-bar ${pct>=75?'bg-success':'bg-danger'}" style="width:${pct}%"></div></div> <small>${pct}%</small></td>
-                </tr>`;
-              }).join('')}
-            </tbody>
-          </table>
-        </div>
-      </div>`;
-    }).join('')}
-  </div>`;
-}
-
-/* ══════════════════════════════════════════════════
-   8. JURNAL (9.0.8)
-   ══════════════════════════════════════════════════ */
-function buildJournal(lecturer, classes) {
-  return `
-  <div class="lec-page">
-    <div class="lec-page-header"><h2><i class="bi bi-journal-text"></i> Jurnal Perkuliahan</h2></div>
-    ${classes.map(cl => {
-      const co = courseObj(cl.courseId);
-      return `
-      <div class="card" style="margin-bottom:1rem">
-        <div class="card-header"><h3 class="card-title">${co?.name || '-'} — ${cl.code}</h3></div>
-        <div class="scroll-x">
-          <table class="data-table">
-            <thead><tr><th>Pertemuan</th><th>Tanggal</th><th>Topik</th><th>Capaian</th><th>Status</th><th>Aksi</th></tr></thead>
-            <tbody>
-              ${[1,2,3].map(i => `
-              <tr>
-                <td>Pertemuan ${i}</td>
-                <td>${formatDate(`2026-09-0${i}`)}</td>
-                <td>${i <= 2 ? 'Topik pertemuan ' + i : '-'}</td>
-                <td>${i <= 2 ? 'CPL-' + i : '-'}</td>
-                <td>${statusBadge(i <= 2 ? 'Terisi' : 'Belum Diisi')}</td>
-                <td><button class="btn btn-secondary btn-sm" onclick="showToast('Isi jurnal pertemuan ${i} (simulasi)','info')"><i class="bi bi-pencil"></i></button></td>
-              </tr>`).join('')}
-            </tbody>
-          </table>
-        </div>
-      </div>`;
-    }).join('')}
-  </div>`;
-}
-
-/* ══════════════════════════════════════════════════
-   9. UJIAN (9.0.9)
-   ══════════════════════════════════════════════════ */
-function buildExam(lecturer, classes) {
-  return `
-  <div class="lec-page">
-    <div class="lec-page-header"><h2><i class="bi bi-pencil-square"></i> Ujian</h2></div>
-    <div class="card">
-      <div class="card-header"><h3 class="card-title">Jadwal UTS/UAS</h3></div>
-      <div class="scroll-x">
-        <table class="data-table">
-          <thead><tr><th>Mata Kuliah</th><th>Kelas</th><th>Jenis</th><th>Tanggal</th><th>Jam</th><th>Ruang</th><th>Peserta</th><th>Aksi</th></tr></thead>
-          <tbody>
-            ${classes.map(cl => {
-              const co = courseObj(cl.courseId);
-              return `
-              <tr><td>${co?.name}</td><td>${cl.code}</td><td><span class="badge badge-warning">UTS</span></td><td>2026-11-10</td><td>08:00–10:00</td><td>${cl.room}</td><td>${cl.enrolled}</td>
-              <td><button class="btn btn-secondary btn-sm" onclick="showToast('Berita acara ujian (simulasi)','info')"><i class="bi bi-file-earmark-text"></i> Berita Acara</button></td></tr>`;
-            }).join('')}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>`;
-}
-
-/* ══════════════════════════════════════════════════
-   11. SKRIPSI / TA (9.0.11)
-   ══════════════════════════════════════════════════ */
-function buildThesis(lecturer) {
-  const theses = DB.getAll('theses').filter(t => t.supervisorId === lecturer.id);
-  const students = DB.getAll('students');
-
-  return `
-  <div class="lec-page">
-    <div class="lec-page-header"><h2><i class="bi bi-file-earmark-text"></i> Skripsi / Tugas Akhir</h2></div>
-    <div class="card">
-      <div class="scroll-x">
-        <table class="data-table">
-          <thead><tr><th>NIM</th><th>Nama</th><th>Judul</th><th>Tahap</th><th>Status</th><th>Aksi</th></tr></thead>
-          <tbody>
-            ${theses.length ? theses.map(t => {
-              const s = students.find(st => st.id === t.studentId);
-              return `<tr>
-                <td><code>${s?.nim||'-'}</code></td><td>${s?.name||'-'}</td>
-                <td style="max-width:300px">${t.title}</td>
-                <td>${statusBadge(t.stage)}</td><td>${statusBadge(t.status)}</td>
-                <td>
-                  <button class="btn btn-secondary btn-sm" onclick="showToast('Riwayat bimbingan (simulasi)','info')"><i class="bi bi-chat-left-dots"></i></button>
-                  <button class="btn btn-primary btn-sm" onclick="showToast('Persetujuan seminar/sidang (simulasi)','info')"><i class="bi bi-check-circle"></i></button>
-                </td>
-              </tr>`;
-            }).join('') : '<tr><td colspan="6"><div class="empty-state" style="padding:1rem"><div class="empty-state-desc">Belum ada mahasiswa bimbingan TA.</div></div></td></tr>'}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>`;
-}
-
-/* ══════════════════════════════════════════════════
-   12. SIDANG & PENGUJI (9.0.12)
-   ══════════════════════════════════════════════════ */
-function buildExamination(lecturer) {
-  return `
-  <div class="lec-page">
-    <div class="lec-page-header"><h2><i class="bi bi-shield-check"></i> Sidang & Penguji</h2></div>
-    <div class="card">
-      <div class="card-header"><h3 class="card-title">Jadwal Sidang</h3></div>
-      <div class="card-body">
-        <div class="empty-state" style="padding:2rem">
-          <i class="bi bi-calendar-x" style="font-size:2rem;color:var(--color-muted)"></i>
-          <div class="empty-state-desc">Tidak ada jadwal sidang yang melibatkan Anda saat ini.</div>
-          <p class="text-muted" style="font-size:0.8rem">Menu ini tampil jika Anda ditugaskan sebagai penguji atau ketua sidang.</p>
-        </div>
-      </div>
-    </div>
-  </div>`;
-}
-
-/* ══════════════════════════════════════════════════
+/* --------------------------------------------------
    17. PROFIL & PENGATURAN (9.0.17)
-   ══════════════════════════════════════════════════ */
+   -------------------------------------------------- */
 function buildProfile(lecturer) {
   const campus = campusName(lecturer.campusId);
   const prodi = prodiName(lecturer.prodiId);

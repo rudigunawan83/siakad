@@ -2,7 +2,7 @@
  * SIAKAD Cakrawala — Sidebar Component
  */
 
-import { AppState, ROLES } from '../state.js';
+import { AppState, ROLES } from '../state.js?v=20261025ab';
 import { showToast } from './toast.js';
 import { DB } from '../data/seed.js';
 

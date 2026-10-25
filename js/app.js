@@ -2,30 +2,30 @@
  * SIAKAD Cakrawala — Application Entry Point
  */
 
-import { initSeed, DB } from './data/seed.js';
-import { AppState } from './state.js';
-import { Router } from './router.js';
+import { initSeed, DB } from './data/seed.js?v=20261025ak';
+import { AppState } from './state.js?v=20261025ab';
+import { Router } from './router.js?v=20261025aa';
 import { renderSidebar } from './components/sidebar.js?v=20261025v';
-import { renderTopbar } from './components/topbar.js?v=20261025aa';
+import { renderTopbar } from './components/topbar.js?v=20261025af';
 import { showToast } from './components/toast.js';
 
 // Pages
 import { renderDashboard } from './pages/dashboard-foundation.js';
-import { renderStudents } from './pages/students.js?v=20261025y';
-import { renderAdmissions } from './pages/admissions.js?v=20261025x';
+import { renderStudents } from './pages/students.js?v=20261025z';
+import { renderAdmissions } from './pages/admissions.js?v=20261025z';
 import { renderFinance } from './pages/finance.js?v=20261025q';
 import {
   renderOrganization, renderAcademic, renderLecturers,
   renderLearning, renderThesis,
-} from './pages/academic.js?v=20261025y';
+} from './pages/academic.js?v=20261025z';
 import {
   renderHR, renderBudget, renderAssets, renderPDDIKTI,
   renderReports, renderSettings, renderAuditLog,
-} from './pages/modules.js?v=20261025x';
+} from './pages/modules.js?v=20261025z';
 import {
   renderStudentPortal, renderParentPortal,
-} from './pages/portals.js';
-import { renderLecturerPortal } from './pages/lecturer-portal.js';
+} from './pages/portals.js?v=20261025ab';
+import { renderLecturerPortal } from './pages/lecturer-portal.js?v=20261025ab';
 import { renderPmbPublic } from './pages/pmb-public.js';
 
 // ---- Boot ----

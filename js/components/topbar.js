@@ -2,7 +2,7 @@
  * SIAKAD Cakrawala — Topbar Component
  */
 
-import { AppState, ROLES } from '../state.js';
+import { AppState, ROLES, canSwitchCampus } from '../state.js?v=20261025ab';
 import { DB } from '../data/seed.js';
 import { renderSidebar } from './sidebar.js';
 import { showToast } from './toast.js';
@@ -26,24 +26,25 @@ export function renderTopbar() {
 
   const role = AppState.currentRole;
   const campuses = DB.getAll('campuses');
-  const academicYears = DB.getAll('academicYears');
   const notifs = DB.getAll('notifications');
   const unread = notifs.filter(n => !n.read).length;
   const isMobileTopbar = window.matchMedia('(max-width: 767.98px)').matches;
 
   // Desktop: nama lengkap. Tablet/mobile: kode saja agar tidak terpotong di tengah kata.
   const campusCompact = window.matchMedia('(max-width: 991.98px)').matches;
+  const campusUnlocked = canSwitchCampus(role);
+  const selectableCampuses = campusUnlocked
+    ? campuses
+    : campuses.filter(campus => campus.id === role.campusId);
   const campusOptions = [
-    `<option value="all" ${AppState.currentCampusFilter === 'all' ? 'selected' : ''}>${campusCompact ? 'Semua' : 'Semua Kampus'}</option>`,
-    ...campuses.map(c => {
+    ...(campusUnlocked
+      ? [`<option value="all" ${AppState.currentCampusFilter === 'all' ? 'selected' : ''}>${campusCompact ? 'Semua' : 'Semua Kampus'}</option>`]
+      : []),
+    ...selectableCampuses.map(c => {
       const label = campusCompact ? c.code : `${c.code} — ${c.name}`;
       return `<option value="${c.id}" title="${c.code} — ${c.name}" ${AppState.currentCampusFilter === c.id ? 'selected' : ''}>${label}</option>`;
-    })
+    }),
   ].join('');
-
-  const yearOptions = academicYears.map(y =>
-    `<option value="${y.id}" ${AppState.currentAcademicYear === y.id ? 'selected' : ''}>${y.name}</option>`
-  ).join('');
 
   const breadcrumb = buildBreadcrumb();
   const roleSwitcherHTML = `
@@ -87,11 +88,8 @@ export function renderTopbar() {
         </div>
       </div>`;
   const filterHTML = `
-      <select class="topbar-select topbar-select--campus" id="campus-filter" title="Filter Kampus">
+      <select class="topbar-select topbar-select--campus" id="campus-filter" title="${campusUnlocked ? 'Filter Kampus' : 'Kampus terikat pada peran aktif'}" ${campusUnlocked ? '' : 'disabled'}>
         ${campusOptions}
-      </select>
-      <select class="topbar-select topbar-select--year" id="year-filter" title="Tahun Akademik">
-        ${yearOptions}
       </select>`;
 
   topbar.innerHTML = isMobileTopbar ? `
@@ -168,7 +166,7 @@ function buildBreadcrumb() {
 function bindTopbarEvents() {
   // Campus filter
   document.getElementById('campus-filter')?.addEventListener('change', e => {
-    AppState.currentCampusFilter = e.target.value;
+    AppState.setCampusFilter(e.target.value);
     Router.refresh();
   });
 

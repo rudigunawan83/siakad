@@ -2,18 +2,19 @@
  * SIAKAD â€” Portal Mahasiswa, Dosen, Orang Tua
  */
 import { DB } from '../data/seed.js';
-import { AppState } from '../state.js';
+import { AppState } from '../state.js?v=20261025ab';
 import { formatRupiah, formatDate, statusBadge } from '../utils.js';
 import { showToast } from '../components/toast.js';
 import { createDoughnutChart, createBarChart } from '../components/charts.js';
+import { scopeRows, scopeStudyPrograms, scopeCampuses, scopeCourses } from '../campus-scope.js';
 import {
   renderStudentKrsEdit,
   renderStudentKrsView,
   renderStudentKrsPrint,
-} from './student-krs.js';
-import { renderStudentRegistration } from './registration.js';
-import { renderStudentPortalExtra, renderStudentDashboard } from './student-portal.js';
-export { renderLecturerPortal } from './lecturer-portal.js';
+} from './student-krs.js?v=20261025aa';
+import { renderStudentRegistration } from './registration.js?v=20261025z';
+import { renderStudentPortalExtra, renderStudentDashboard } from './student-portal.js?v=20261025aa';
+export { renderLecturerPortal } from './lecturer-portal.js?v=20261025ab';
 
 // ===================== STUDENT PORTAL =====================
 export function renderStudentPortal(path, container) {
@@ -203,9 +204,9 @@ function buildStudentSchedule(enrolls, classes, courses) {
       ${schedule[d].length===0 ? '<div style="font-size:var(--text-xs);color:var(--color-muted);padding:0.5rem">Tidak ada kelas</div>' :
         schedule[d].map(cl=>`
           <div class="schedule-class-card">
-            <div class="schedule-class-time">${cl.startTime}â€“${cl.endTime}</div>
+            <div class="schedule-class-time">${cl.startTime}–${cl.endTime}</div>
             <div class="schedule-class-name">${cl.courseName}</div>
-            <div class="schedule-class-meta">${cl.code} Â· ${cl.room} Â· ${cl.sks} SKS</div>
+            <div class="schedule-class-meta">${cl.code} · ${cl.room} · ${cl.sks} SKS</div>
           </div>`).join('')}
     </div>`).join('')}
 </div>`;
@@ -239,14 +240,14 @@ function buildStudentThesis(theses) {
 // ===================== PARENT PORTAL =====================
 export function renderParentPortal(path, container) {
   const role    = AppState.currentRole;
-  const student = DB.getAll('students').find(s => s.id === (role.studentId || 'stu-1'));
-  if (!student) { container.innerHTML = '<div class="page-container"><p>Data tidak ditemukan.</p></div>'; return; }
+  const student = scopeRows(DB.getAll('students')).find(s => s.id === (role.studentId || 'stu-1'));
+  if (!student) { container.innerHTML = '<div class="page-container"><p>Data mahasiswa tidak ditemukan untuk kampus yang sedang dipilih.</p></div>'; return; }
 
-  const prodi   = DB.getAll('studyPrograms').find(p=>p.id===student.prodiId);
-  const campus  = DB.getAll('campuses').find(c=>c.id===student.campusId);
+  const prodi   = scopeStudyPrograms(DB.getAll('studyPrograms')).find(p=>p.id===student.prodiId);
+  const campus  = scopeCampuses(DB.getAll('campuses')).find(c=>c.id===student.campusId);
   const invoices= DB.getAll('invoices').filter(i=>i.studentId===student.id);
   const grades  = DB.getAll('grades').filter(g=>g.studentId===student.id&&g.status==='final');
-  const courses = DB.getAll('courses');
+  const courses = scopeCourses(DB.getAll('courses'), DB.getAll('studyPrograms'));
 
   container.innerHTML = `
 <div class="page-container portal-container">
@@ -255,7 +256,7 @@ export function renderParentPortal(path, container) {
     <div class="portal-header-info">
       <div style="font-size:var(--text-xs);opacity:0.7;margin-bottom:4px">Portal Orang Tua/Wali</div>
       <div class="portal-header-name">Pemantauan: ${student.name}</div>
-      <div class="portal-header-sub">${student.nim} Â· ${prodi?.name||'-'} Â· ${campus?.code||'-'}</div>
+      <div class="portal-header-sub">${student.nim} · ${prodi?.name||'-'} · ${campus?.code||'-'}</div>
     </div>
   </div>
 

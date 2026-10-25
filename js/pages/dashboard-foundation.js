@@ -3,7 +3,7 @@
  */
 
 import { DB } from '../data/seed.js';
-import { AppState } from '../state.js';
+import { AppState } from '../state.js?v=20261025ab';
 import { formatRupiah, formatNumber, formatDateRelative, abbreviateNum } from '../utils.js';
 import { createBarChart, createLineChart, createDoughnutChart, formatRupiahShort } from '../components/charts.js';
 import { showToast } from '../components/toast.js';
@@ -227,7 +227,7 @@ export function renderDashboard(path, container) {
                   <i class="bi bi-shield-check"></i>
                 </div>
                 <div class="activity-body">
-                  <div class="activity-text"><strong>${l.user}</strong> â€“ ${l.activity}: ${l.object}</div>
+                  <div class="activity-text"><strong>${l.user}</strong> – ${l.activity}: ${l.object}</div>
                   <div class="activity-time">${formatDateRelative(l.time)}</div>
                 </div>
               </li>`).join('')}

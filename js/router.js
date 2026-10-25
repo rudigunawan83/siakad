@@ -2,9 +2,9 @@
  * SIAKAD Cakrawala — Hash Router
  */
 
-import { AppState } from './state.js';
+import { AppState } from './state.js?v=20261025ab';
 import { renderSidebar } from './components/sidebar.js';
-import { renderTopbar } from './components/topbar.js';
+import { renderTopbar } from './components/topbar.js?v=20261025af';
 
 const routes = {};
 let _currentRoute = null;

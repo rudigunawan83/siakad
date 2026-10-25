@@ -8,6 +8,7 @@ import { formatDate, generateId, statusBadge, today } from '../utils.js';
 import { DataTable } from '../components/data-table.js';
 import { openFormModal, openModal } from '../components/modal.js';
 import { showToast, showConfirm } from '../components/toast.js';
+import { scopeRows, scopeCampuses, scopeStudyPrograms } from '../campus-scope.js';
 
 function esc(s) {
   return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -83,11 +84,13 @@ function assignAdvisor({ studentId, lecturerId, startDate, note = '' }) {
 
 export function renderAdvisors(path, container) {
   ensureAdvisorAssignments();
-  const assignments = DB.getAll('advisorAssignments');
-  const students = DB.getAll('students');
-  const lecturers = DB.getAll('lecturers');
-  const programs = DB.getAll('studyPrograms');
-  const campuses = DB.getAll('campuses');
+  const students = scopeRows(DB.getAll('students'));
+  const lecturers = scopeRows(DB.getAll('lecturers'));
+  const programs = scopeStudyPrograms(DB.getAll('studyPrograms'));
+  const campuses = scopeCampuses(DB.getAll('campuses'));
+  const allowedStudentIds = new Set(students.map(item => item.id));
+  const allowedLecturerIds = new Set(lecturers.map(item => item.id));
+  const assignments = DB.getAll('advisorAssignments').filter(item => allowedStudentIds.has(item.studentId) || allowedLecturerIds.has(item.lecturerId));
 
   const active = assignments.filter(a => a.status === 'aktif');
   const without = students.filter(s => ['aktif', 'cuti'].includes(s.status) && !s.advisor);
@@ -277,9 +280,9 @@ function handleRow(action, row, container) {
 }
 
 function openAssignModal(container, preset = {}) {
-  const students = DB.getAll('students').filter(s => ['aktif', 'cuti'].includes(s.status));
-  const lecturers = DB.getAll('lecturers').filter(l => l.status === 'aktif');
-  const programs = DB.getAll('studyPrograms');
+  const students = scopeRows(DB.getAll('students')).filter(s => ['aktif', 'cuti'].includes(s.status));
+  const lecturers = scopeRows(DB.getAll('lecturers')).filter(l => l.status === 'aktif');
+  const programs = scopeStudyPrograms(DB.getAll('studyPrograms'));
 
   openFormModal({
     title: preset.studentId ? 'Ganti dosen wali' : 'Tetapkan dosen wali',

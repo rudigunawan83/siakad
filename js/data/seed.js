@@ -4,19 +4,21 @@
  */
 
 import { Storage } from '../storage.js';
-import { foundation, campuses, faculties, studyPrograms, academicYears, semesters, academicCalendar } from './organization.js';
-import { students, admissions, scholarships } from './students.js';
+import { foundation, campuses, faculties, studyPrograms, academicYears, semesters, academicCalendar } from './organization.js?v=20261025aj';
+import { students, admissions, scholarships } from './students.js?v=20261025aj';
 import {
   lecturers, courses, curricula, classes, enrollments, attendances, grades, theses,
   notifications, auditLogs, krsPolicy, registrationPolicy, semesterRegistrations, krsPlans,
-} from './academic.js';
-import { invoices, payments, chartOfAccounts, journals, budgets, employees, payrollRuns, assets, procurementRequests, pddiktiJobs, demoUsers } from './finance.js';
+} from './academic.js?v=20261025aj';
+import { invoices, payments, chartOfAccounts, journals, budgets, employees, payrollRuns, assets, procurementRequests, pddiktiJobs, demoUsers } from './finance.js?v=20261025aj';
 import {
   classAnnouncements, advisingConsultations, lecturerAdminRequests,
   classAssignments, assignmentSubmissions,
-} from './lecturer-portal-data.js';
+  lectureMaterials, lectureJournals, lectureExams, scheduleReplacements,
+  gradeComponents, thesisNotes, lectureDefenses,
+} from './lecturer-portal-data.js?v=20261025aj';
 
-const SEED_VERSION = 'v1.6';
+const SEED_VERSION = 'v1.7';
 
 /** Koleksi wajib — jika kosong padahal versi cocok, seed dianggap rusak (sering di HP / kuota penuh). */
 const CRITICAL_COLLECTIONS = [
@@ -96,6 +98,13 @@ export function initSeed(force = false) {
   put('lecturerAdminRequests', lecturerAdminRequests);
   put('classAssignments', classAssignments);
   put('assignmentSubmissions', assignmentSubmissions);
+  put('lectureMaterials', lectureMaterials);
+  put('lectureJournals', lectureJournals);
+  put('lectureExams', lectureExams);
+  put('scheduleReplacements', scheduleReplacements);
+  put('gradeComponents', gradeComponents);
+  put('thesisNotes', thesisNotes);
+  put('lectureDefenses', lectureDefenses);
 
   put('invoices', invoices);
   put('payments', payments);

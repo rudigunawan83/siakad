@@ -151,6 +151,15 @@ const MENU_ACCESS = {
   'parent':           ['portal-parent'],
 };
 
+export function canSwitchCampus(role = AppState.currentRole) {
+  return !role?.campusId;
+}
+
+export function resolveCampusFilter(preferred, role = AppState.currentRole) {
+  if (role?.campusId) return role.campusId;
+  return preferred || 'all';
+}
+
 // ---- AppState ----
 export const AppState = {
   currentRole: ROLES[0],
@@ -167,6 +176,9 @@ export const AppState = {
       const r = ROLES.find(x => x.id === savedRoleId);
       if (r) this.currentRole = r;
     }
+    const savedCampusFilter = localStorage.getItem('siakad-campus-filter');
+    this.currentCampusFilter = resolveCampusFilter(savedCampusFilter, this.currentRole);
+    localStorage.setItem('siakad-campus-filter', this.currentCampusFilter);
     // Restore sidebar state
     const collapsed = localStorage.getItem('siakad-sidebar-collapsed');
     this.sidebarCollapsed = collapsed === 'true';
@@ -179,8 +191,14 @@ export const AppState = {
     if (!role) return;
     this.currentRole = role;
     localStorage.setItem('siakad-role', roleId);
-    this.currentCampusFilter = role.campusId || 'all';
+    this.currentCampusFilter = resolveCampusFilter(role.campusId || 'all', role);
+    localStorage.setItem('siakad-campus-filter', this.currentCampusFilter);
     this.updateNotifCount();
+  },
+
+  setCampusFilter(campusId) {
+    this.currentCampusFilter = resolveCampusFilter(campusId, this.currentRole);
+    localStorage.setItem('siakad-campus-filter', this.currentCampusFilter);
   },
 
   updateNotifCount() {

@@ -2,12 +2,37 @@
  * SIAKAD — HR, Budget, Assets, PDDIKTI, Reports, Settings Pages
  */
 import { DB } from '../data/seed.js';
-import { AppState } from '../state.js';
+import { AppState } from '../state.js?v=20261025ab';
 import { formatRupiah, formatDate, statusBadge, exportCSV, generateId } from '../utils.js';
 import { DataTable } from '../components/data-table.js';
 import { showToast, showConfirm } from '../components/toast.js';
 import { createBarChart, createDoughnutChart, formatRupiahShort } from '../components/charts.js';
 import { renderComingSoon } from '../ui-helpers.js';
+import { scopeRows, scopeCampuses } from '../campus-scope.js';
+
+function getScopedCampuses() {
+  return scopeCampuses(DB.getAll('campuses'));
+}
+
+function getScopedEmployees() {
+  return scopeRows(DB.getAll('employees'));
+}
+
+function getScopedPayrollRuns() {
+  return scopeRows(DB.getAll('payrollRuns'));
+}
+
+function getScopedAssets() {
+  return scopeRows(DB.getAll('assets'));
+}
+
+function getScopedProcurementRequests() {
+  return scopeRows(DB.getAll('procurementRequests'));
+}
+
+function getScopedPddiktiJobs() {
+  return scopeRows(DB.getAll('pddiktiJobs'));
+}
 
 // ===================== HR & PAYROLL =====================
 export function renderHR(path, container) {
@@ -25,8 +50,8 @@ export function renderHR(path, container) {
 }
 
 function renderEmployees(container) {
-  const employees = DB.getAll('employees');
-  const campuses  = DB.getAll('campuses');
+  const employees = getScopedEmployees();
+  const campuses  = getScopedCampuses();
   container.innerHTML = `
 <div class="page-container">
   <div class="page-header">
@@ -64,7 +89,7 @@ function renderEmployees(container) {
 }
 
 function renderHrPositions(container) {
-  const employees = DB.getAll('employees');
+  const employees = getScopedEmployees();
   const rows = Object.values(employees.reduce((acc, employee) => {
     const key = employee.position;
     if (!acc[key]) acc[key] = { position: key, unit: employee.unit, count: 0, avgSalary: 0, totalSalary: 0 };
@@ -134,8 +159,8 @@ function renderHrSalaryComponents(container) {
 }
 
 function renderHrReports(container) {
-  const employees = DB.getAll('employees');
-  const payrollRuns = DB.getAll('payrollRuns');
+  const employees = getScopedEmployees();
+  const payrollRuns = getScopedPayrollRuns();
   const totalNet = payrollRuns.reduce((sum, row) => sum + (row.totalNet || 0), 0);
   container.innerHTML = `
 <div class="page-container">
@@ -149,8 +174,8 @@ function renderHrReports(container) {
 }
 
 function renderPayroll(container) {
-  const runs    = DB.getAll('payrollRuns');
-  const campuses= DB.getAll('campuses');
+  const runs    = getScopedPayrollRuns();
+  const campuses= getScopedCampuses();
   container.innerHTML = `
 <div class="page-container">
   <div class="page-header">
@@ -178,7 +203,8 @@ function renderPayroll(container) {
   });
 
   document.getElementById('run-payroll')?.addEventListener('click',()=>{
-    const newRun = {id:generateId('prl'),period:`Oktober 2026 (Simulasi)`,campusId:'campus-1',totalEmployee:215,totalGross:1855000000,totalDeductions:212000000,totalNet:1643000000,status:'diperiksa',processedBy:`${AppState.currentRole.user} (demo)`,approvedBy:null,processedAt:new Date().toISOString().slice(0,10)};
+    const defaultCampusId = AppState.currentCampusFilter === 'all' ? (getScopedCampuses()[0]?.id || 'campus-1') : AppState.currentCampusFilter;
+    const newRun = {id:generateId('prl'),period:`Oktober 2026 (Simulasi)`,campusId:defaultCampusId,totalEmployee:215,totalGross:1855000000,totalDeductions:212000000,totalNet:1643000000,status:'diperiksa',processedBy:`${AppState.currentRole.user} (demo)`,approvedBy:null,processedAt:new Date().toISOString().slice(0,10)};
     DB.add('payrollRuns',newRun);
     DB.log('Proses Payroll Demo','SDM','Periode: Oktober 2026','Berhasil (Simulasi)');
     showToast('Payroll Oktober 2026 berhasil diproses (simulasi).','gold');
@@ -192,14 +218,14 @@ function renderPayroll(container) {
   };
 
   window.viewPayslip = id=>{
-    const run = DB.getAll('payrollRuns').find(r=>r.id===id);
+    const run = getScopedPayrollRuns().find(r=>r.id===id);
     if(!run) return;
     import('./components/modal.js').catch(()=>import('../components/modal.js')).then(({openModal})=>{
       openModal({
         title:'Contoh Slip Gaji (Simulasi)',
         body:`<div class="payslip">
           <div class="payslip-header"><div style="font-size:1.1rem;font-weight:700">SIAKAD Cakrawala</div><div style="font-size:0.8rem;opacity:0.7">Slip Gaji — ${run.period}</div></div>
-          <div style="margin-bottom:1rem"><div class="stat-row"><span class="stat-row-label">Nama</span><span class="stat-row-value">Dr. Rizki Pratama, M.T.</span></div><div class="stat-row"><span class="stat-row-label">Jabatan</span><span class="stat-row-value">Lektor Kepala</span></div><div class="stat-row"><span class="stat-row-label">Unit</span><span class="stat-row-value">Teknik Informatika – UCJ</span></div></div>
+          <div style="margin-bottom:1rem"><div class="stat-row"><span class="stat-row-label">Nama</span><span class="stat-row-value">Dr. Rizki Pratama, M.T.</span></div><div class="stat-row"><span class="stat-row-label">Jabatan</span><span class="stat-row-value">Lektor Kepala</span></div><div class="stat-row"><span class="stat-row-label">Unit</span><span class="stat-row-value">Teknik Informatika � UCJ</span></div></div>
           <div class="payslip-section-title">Pendapatan</div>
           ${[['Gaji Pokok','Rp 15.000.000'],['Tunjangan Jabatan','Rp 3.500.000'],['Tunjangan Fungsional','Rp 2.800.000'],['Tunjangan Transportasi','Rp 1.200.000']].map(([k,v])=>`<div class="payslip-row"><span>${k}</span><span style="color:var(--color-success)">${v}</span></div>`).join('')}
           <div class="payslip-section-title">Potongan</div>
@@ -225,8 +251,8 @@ export function renderAssets(path, container) {
 }
 
 function renderAssetList(container) {
-  const assets   = DB.getAll('assets');
-  const campuses = DB.getAll('campuses');
+  const assets   = getScopedAssets();
+  const campuses = getScopedCampuses();
   container.innerHTML = `
 <div class="page-container">
   <div class="page-header"><div class="page-header-info"><h1 class="page-title">Master Aset</h1><p class="page-desc">${assets.length} aset terdaftar</p></div><div class="page-actions"><a href="#/procurement" class="btn btn-secondary"><i class="bi bi-cart-plus"></i> Pengadaan</a><button class="btn btn-accent"><i class="bi bi-plus-lg"></i> Tambah Aset</button></div></div>
@@ -250,8 +276,8 @@ function renderAssetList(container) {
 }
 
 function renderProcurement(container) {
-  const procs    = DB.getAll('procurementRequests');
-  const campuses = DB.getAll('campuses');
+  const procs    = getScopedProcurementRequests();
+  const campuses = getScopedCampuses();
   container.innerHTML = `
 <div class="page-container">
   <div class="page-header"><div class="page-header-info"><h1 class="page-title">Pengajuan Pengadaan</h1></div><div class="page-actions"><button class="btn btn-accent" id="add-proc"><i class="bi bi-plus-lg"></i> Ajukan Pengadaan</button></div></div>
@@ -277,7 +303,7 @@ function renderProcurement(container) {
 }
 
 function renderAssetCategories(container) {
-  const assets = DB.getAll('assets');
+  const assets = getScopedAssets();
   const rows = Object.values(assets.reduce((acc, asset) => {
     if (!acc[asset.category]) acc[asset.category] = { category: asset.category, count: 0, value: 0 };
     acc[asset.category].count += 1;
@@ -305,7 +331,7 @@ function renderAssetCategories(container) {
 }
 
 function renderAssetMaintenance(container) {
-  const assets = DB.getAll('assets').filter(asset => asset.condition !== 'baik' || asset.status !== 'aktif');
+  const assets = getScopedAssets().filter(asset => asset.condition !== 'baik' || asset.status !== 'aktif');
   container.innerHTML = `
 <div class="page-container">
   <div class="page-header"><div class="page-header-info"><h1 class="page-title">Pemeliharaan Aset</h1><p class="page-desc">Aset yang perlu perhatian berdasarkan kondisi atau status</p></div></div>
@@ -326,8 +352,8 @@ function renderAssetMaintenance(container) {
 }
 
 function renderProcurementApproval(container) {
-  const procs = DB.getAll('procurementRequests').filter(item => ['diajukan', 'menunggu persetujuan'].includes(item.status));
-  const campuses = DB.getAll('campuses');
+  const procs = getScopedProcurementRequests().filter(item => ['diajukan', 'menunggu persetujuan'].includes(item.status));
+  const campuses = getScopedCampuses();
   container.innerHTML = `
 <div class="page-container">
   <div class="page-header"><div class="page-header-info"><h1 class="page-title">Persetujuan Pengadaan</h1><p class="page-desc">Pengajuan yang sedang menunggu keputusan</p></div></div>
@@ -347,8 +373,8 @@ function renderProcurementApproval(container) {
 }
 
 function renderProcurementReceipt(container) {
-  const procs = DB.getAll('procurementRequests').filter(item => ['disetujui', 'terima barang'].includes(item.status));
-  const campuses = DB.getAll('campuses');
+  const procs = getScopedProcurementRequests().filter(item => ['disetujui', 'terima barang'].includes(item.status));
+  const campuses = getScopedCampuses();
   container.innerHTML = `
 <div class="page-container">
   <div class="page-header"><div class="page-header-info"><h1 class="page-title">Penerimaan Barang</h1><p class="page-desc">Pengadaan yang sudah disetujui atau diterima</p></div></div>
@@ -368,7 +394,7 @@ function renderProcurementReceipt(container) {
 }
 
 function renderAssetReports(container) {
-  const assets = DB.getAll('assets');
+  const assets = getScopedAssets();
   const totalValue = assets.reduce((sum, item) => sum + (item.acquiredValue || 0), 0);
   const activeCount = assets.filter(item => item.status === 'aktif').length;
   container.innerHTML = `
@@ -573,8 +599,8 @@ export function renderPDDIKTI(path, container) {
 }
 
 function renderPddiktiDashboard(path, container) {
-  const jobs     = DB.getAll('pddiktiJobs');
-  const campuses = DB.getAll('campuses');
+  const jobs     = getScopedPddiktiJobs();
+  const campuses = getScopedCampuses();
   const statusColors = {'simulasi berhasil':'#198754','simulasi gagal sebagian':'#dc3545','perlu perbaikan':'#d97706','siap disinkronkan':'#0d6efd','simulasi berhasil sebagian':'#d97706'};
   container.innerHTML = `
 <div class="page-container">
@@ -614,7 +640,7 @@ function renderPddiktiDashboard(path, container) {
     data:jobs, searchFields:['batch','type'],
   });
   window.syncBatch = id=>{
-    const job = DB.getAll('pddiktiJobs').find(j=>j.id===id);
+    const job = getScopedPddiktiJobs().find(j=>j.id===id);
     if(!job) return;
     DB.update('pddiktiJobs',id,{status:'simulasi berhasil',synced:job.valid,failed:job.needFix,date:new Date().toISOString().slice(0,10)});
     DB.log('Simulasi Sinkronisasi PDDIKTI','PDDIKTI',`Batch: ${job.batch}`,'Simulasi Berhasil');
@@ -622,7 +648,7 @@ function renderPddiktiDashboard(path, container) {
     renderPddiktiDashboard(path,container);
   };
   document.getElementById('sync-all')?.addEventListener('click',()=>{
-    const allJobs = DB.getAll('pddiktiJobs');
+    const allJobs = getScopedPddiktiJobs();
     allJobs.forEach(j=>DB.update('pddiktiJobs',j.id,{status:'simulasi berhasil',synced:j.valid,date:new Date().toISOString().slice(0,10)}));
     showToast(`Semua ${allJobs.length} batch berhasil disinkronkan (simulasi).`,'gold');
     renderPddiktiDashboard(path,container);
@@ -630,9 +656,9 @@ function renderPddiktiDashboard(path, container) {
 }
 
 function renderPddiktiList(container, title, desc, predicate, sortByDateDesc = false) {
-  const campuses = DB.getAll('campuses');
+  const campuses = getScopedCampuses();
   const statusColors = {'simulasi berhasil':'#198754','simulasi gagal sebagian':'#dc3545','perlu perbaikan':'#d97706','siap disinkronkan':'#0d6efd','simulasi berhasil sebagian':'#d97706'};
-  const jobs = DB.getAll('pddiktiJobs').filter(predicate);
+  const jobs = getScopedPddiktiJobs().filter(predicate);
   if (sortByDateDesc) jobs.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   container.innerHTML = `
 <div class="page-container">
@@ -696,9 +722,9 @@ export function renderReports(path, container) {
 </div>`;
   requestAnimationFrame(()=>{
     import('./charts.js').catch(()=>import('../components/charts.js')).then(({createBarChart:cB,createDoughnutChart:cD,formatRupiahShort:fR})=>{
-      const students = DB.getAll('students');
-      const campuses = DB.getAll('campuses');
-      const invoices = DB.getAll('invoices');
+      const students = scopeRows(DB.getAll('students'));
+      const campuses = getScopedCampuses();
+      const invoices = scopeRows(DB.getAll('invoices'));
       cB('rpt-trend',{labels:campuses.map(c=>c.code),datasets:[{label:'Aktif',data:campuses.map(c=>students.filter(s=>s.campusId===c.id&&s.status==='aktif').length),color:'#213550'}],height:220});
       const statusG={};invoices.forEach(i=>{statusG[i.status]=(statusG[i.status]||0)+1;});
       cD('rpt-inv',{labels:Object.keys(statusG),data:Object.values(statusG),colors:['#198754','#d97706','#dc3545','#0d6efd','#9ca3af'],height:220});
@@ -707,8 +733,9 @@ export function renderReports(path, container) {
 }
 
 function renderAcademicReports(container) {
-  const students = DB.getAll('students');
-  const grades = DB.getAll('grades').filter(item => item.status === 'final');
+  const students = scopeRows(DB.getAll('students'));
+  const allowedStudentIds = new Set(students.map(item => item.id));
+  const grades = DB.getAll('grades').filter(item => item.status === 'final' && allowedStudentIds.has(item.studentId));
   const active = students.filter(item => item.status === 'aktif').length;
   const avgGpa = students.reduce((sum, item) => sum + (item.ipk || 0), 0) / (students.length || 1);
   const passedCourses = grades.filter(item => (item.finalScore || 0) >= 60).length;
@@ -724,7 +751,7 @@ function renderAcademicReports(container) {
 }
 
 function renderAdmissionsReports(container) {
-  const admissions = DB.getAll('admissions');
+  const admissions = scopeRows(DB.getAll('admissions'));
   const converted = admissions.filter(item => item.status === 'menjadi mahasiswa').length;
   const passed = admissions.filter(item => item.selectionStatus === 'lulus seleksi').length;
   container.innerHTML = `
@@ -739,7 +766,7 @@ function renderAdmissionsReports(container) {
 }
 
 function renderFinanceReportsSummary(container) {
-  const invoices = DB.getAll('invoices');
+  const invoices = scopeRows(DB.getAll('invoices'));
   const paid = invoices.reduce((sum, item) => sum + (item.paid || 0), 0);
   const remaining = invoices.reduce((sum, item) => sum + (item.remaining || 0), 0);
   container.innerHTML = `
@@ -754,7 +781,7 @@ function renderFinanceReportsSummary(container) {
 }
 
 function renderBudgetReportsSummary(container) {
-  const budgetItems = DB.getAll('budgets').filter(item => item.status === 'disetujui');
+  const budgetItems = getFilteredBudgets().filter(item => item.status === 'disetujui');
   const totalBudget = budgetItems.reduce((sum, item) => sum + (item.approved || 0), 0);
   const realized = budgetItems.reduce((sum, item) => sum + (item.realized || 0), 0);
   container.innerHTML = `
@@ -769,7 +796,7 @@ function renderBudgetReportsSummary(container) {
 }
 
 function renderPddiktiReportsSummary(container) {
-  const jobs = DB.getAll('pddiktiJobs');
+  const jobs = getScopedPddiktiJobs();
   const synced = jobs.reduce((sum, item) => sum + (item.synced || 0), 0);
   const needFix = jobs.reduce((sum, item) => sum + (item.needFix || 0), 0);
   container.innerHTML = `
@@ -784,9 +811,9 @@ function renderPddiktiReportsSummary(container) {
 }
 
 function renderConsolidationReportsSummary(container) {
-  const campuses = DB.getAll('campuses');
-  const students = DB.getAll('students');
-  const invoices = DB.getAll('invoices');
+  const campuses = getScopedCampuses();
+  const students = scopeRows(DB.getAll('students'));
+  const invoices = scopeRows(DB.getAll('invoices'));
   const rows = campuses.map(campus => ({
     campus: campus.code,
     students: students.filter(item => item.campusId === campus.id && item.status === 'aktif').length,

@@ -3,14 +3,19 @@
  */
 
 import { DB } from '../data/seed.js';
-import { AppState } from '../state.js';
+import { AppState } from '../state.js?v=20261025ab';
 import { formatDate, statusBadge, exportCSV, generateId, today } from '../utils.js';
 import { DataTable } from '../components/data-table.js';
 import { openFormModal } from '../components/modal.js';
 import { showToast, showConfirm } from '../components/toast.js';
 import { createBarChart, createDoughnutChart } from '../components/charts.js';
+import { scopeRows, scopeCampuses, scopeStudyPrograms } from '../campus-scope.js';
 
 let _table;
+
+const getScopedAdmissions = () => scopeRows(DB.getAll('admissions'));
+const getScopedCampuses = () => scopeCampuses(DB.getAll('campuses'));
+const getScopedPrograms = () => scopeStudyPrograms(DB.getAll('studyPrograms'));
 
 export function renderAdmissions(path, container) {
   if (path.includes('/dashboard')) return renderPmbDashboard(container);
@@ -62,7 +67,7 @@ function slugName(name) {
 }
 
 /**
- * Konversi pendaftar → mahasiswa (PMB-010).
+ * Konversi pendaftar ? mahasiswa (PMB-010).
  * @returns {{ ok: boolean, student?: object, msg: string }}
  */
 export function convertApplicantToStudent(admission, opts = {}) {
@@ -140,7 +145,7 @@ export function convertApplicantToStudent(admission, opts = {}) {
     prodiName: prodi.name,
   });
 
-  DB.log('PMB: Konversi Mahasiswa', 'PMB', `${admission.regNum} → ${nim} (${student.name})`);
+  DB.log('PMB: Konversi Mahasiswa', 'PMB', `${admission.regNum} ? ${nim} (${student.name})`);
   DB.addNotif(
     'success',
     'Mahasiswa baru dari PMB',
@@ -149,7 +154,7 @@ export function convertApplicantToStudent(admission, opts = {}) {
     ['admin', 'baak', 'academic-staff']
   );
 
-  return { ok: true, student, msg: `Berhasil: ${student.name} → NIM ${nim}` };
+  return { ok: true, student, msg: `Berhasil: ${student.name} ? NIM ${nim}` };
 }
 
 function confirmReRegistration(admission, { finalProdiId, note = '' } = {}) {
@@ -172,14 +177,14 @@ function confirmReRegistration(admission, { finalProdiId, note = '' } = {}) {
     reRegisteredAt: new Date().toISOString(),
     reRegisterNote: note || 'Daftar ulang dicatat petugas PMB (demo).',
   });
-  DB.log('PMB: Daftar Ulang', 'PMB', `${admission.regNum} — ${admission.name} → ${prodi.name}`);
+  DB.log('PMB: Daftar Ulang', 'PMB', `${admission.regNum} — ${admission.name} ? ${prodi.name}`);
   return { ok: true, msg: `Daftar ulang ${admission.name} tercatat.` };
 }
 
 // ---- Applicants List ----
 function renderApplicants(path, container) {
-  const campuses = DB.getAll('campuses');
-  const admissions = DB.getAll('admissions');
+  const campuses = getScopedCampuses();
+  const admissions = getScopedAdmissions();
 
   const statusOpts = ['all','draft','dikirim','menunggu verifikasi','terverifikasi','perlu perbaikan','menunggu seleksi','lulus seleksi','tidak lulus','daftar ulang','menjadi mahasiswa'].map(s=>({value:s,label:s==='all'?'Semua Status':s.charAt(0).toUpperCase()+s.slice(1)}));
   const campusOpts = [{value:'all',label:'Semua Kampus'}, ...campuses.map(c=>({value:c.id,label:c.name}))];
@@ -259,7 +264,7 @@ function buildPmbKPIs(admissions) {
 }
 
 function renderPeriods(container) {
-  const admissions = DB.getAll('admissions');
+  const admissions = getScopedAdmissions();
   const pathSummary = Object.entries(admissions.reduce((acc, item) => {
     acc[item.path] = (acc[item.path] || 0) + 1;
     return acc;
@@ -307,8 +312,8 @@ function renderPeriods(container) {
 }
 
 function renderPmbReports(container) {
-  const admissions = DB.getAll('admissions');
-  const campuses = DB.getAll('campuses');
+  const admissions = getScopedAdmissions();
+  const campuses = getScopedCampuses();
   const converted = admissions.filter(item => item.status === 'menjadi mahasiswa').length;
   const reRegistered = admissions.filter(item => item.status === 'daftar ulang').length;
   const passed = admissions.filter(item => item.selectionStatus === 'lulus seleksi').length;
@@ -350,8 +355,8 @@ function renderPmbReports(container) {
 }
 
 function buildAdmTable(campuses) {
-  const admissions = DB.getAll('admissions');
-  const studyPrograms = DB.getAll('studyPrograms');
+  const admissions = getScopedAdmissions();
+  const studyPrograms = getScopedPrograms();
   const STATUS_ACTIONS = {
     'menunggu verifikasi': [
       { label: 'Verifikasi', action: 'verify', cls: 'btn-success' },
@@ -362,7 +367,7 @@ function buildAdmTable(campuses) {
       { label: 'Lulus', action: 'pass', cls: 'btn-success' },
       { label: 'Tidak Lulus', action: 'fail', cls: 'btn-danger' },
     ],
-    'lulus seleksi': [{ label: 'Daftar Ulang ✓', action: 're-register', cls: 'btn-accent' }],
+    'lulus seleksi': [{ label: 'Daftar Ulang ?', action: 're-register', cls: 'btn-accent' }],
     'daftar ulang': [{ label: 'Jadi Mahasiswa', action: 'convert', cls: 'btn-primary' }],
   };
 
@@ -424,7 +429,7 @@ function handleAdmAction(action, item) {
   if (action === 're-register') {
     const result = confirmReRegistration(item);
     showToast(result.msg, result.ok ? 'success' : 'warning');
-    if (result.ok) _table?.setData(DB.getAll('admissions'));
+    if (result.ok) _table?.setData(getScopedAdmissions());
     return;
   }
 
@@ -438,7 +443,7 @@ function handleAdmAction(action, item) {
       if (!ok) return;
       const result = convertApplicantToStudent(item);
       showToast(result.msg, result.ok ? 'success' : 'danger');
-      if (result.ok) _table?.setData(DB.getAll('admissions'));
+      if (result.ok) _table?.setData(getScopedAdmissions());
     });
     return;
   }
@@ -449,7 +454,7 @@ function handleAdmAction(action, item) {
   DB.update('admissions', item.id, mapping);
   DB.log(`PMB: ${action}`, 'PMB', `Pendaftar: ${item.name} (${item.regNum})`);
   showToast(mapping.msg, action==='fail'?'warning':'success');
-  _table?.setData(DB.getAll('admissions'));
+  _table?.setData(getScopedAdmissions());
 }
 
 function bindAdmEvents(campuses) {
@@ -466,7 +471,7 @@ function bindAdmEvents(campuses) {
     _table?.clearFilters();
   });
   document.getElementById('exp-csv')?.addEventListener('click', () => {
-    exportCSV(DB.getAll('admissions'),'pmb-pendaftar',[
+    exportCSV(getScopedAdmissions(),'pmb-pendaftar',[
       {key:'regNum',label:'No Daftar'},{key:'name',label:'Nama'},{key:'prodiName',label:'Prodi'},
       {key:'path',label:'Jalur'},{key:'date',label:'Tgl Daftar'},{key:'status',label:'Status'},
     ]);
@@ -475,8 +480,8 @@ function bindAdmEvents(campuses) {
 
 // ---- PMB Dashboard ----
 function renderPmbDashboard(container) {
-  const admissions = DB.getAll('admissions');
-  const campuses = DB.getAll('campuses');
+  const admissions = getScopedAdmissions();
+  const campuses = getScopedCampuses();
   container.innerHTML = `
 <div class="page-container">
   <div class="page-header">
@@ -519,7 +524,7 @@ function renderPmbDashboard(container) {
 
 // ---- Verification Page ----
 function renderVerification(container) {
-  const pending = DB.getAll('admissions').filter(a=>a.docStatus==='menunggu verifikasi'||a.status==='dikirim');
+  const pending = getScopedAdmissions().filter(a=>a.docStatus==='menunggu verifikasi'||a.status==='dikirim');
   container.innerHTML = `
 <div class="page-container">
   <div class="page-header">
@@ -535,7 +540,7 @@ function renderVerification(container) {
         <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:1rem">
           <div>
             <div style="font-weight:var(--font-semibold)">${a.name} <span class="badge badge-info">${a.regNum}</span></div>
-            <div style="font-size:var(--text-xs);color:var(--color-muted)">${a.prodiName} · ${a.path}</div>
+            <div style="font-size:var(--text-xs);color:var(--color-muted)">${a.prodiName} � ${a.path}</div>
             <div style="margin-top:0.5rem">
               ${['KTP/NIK','Ijazah/SKL','Foto 3x4','Sertifikat Prestasi'].map(d=>`<span class="badge badge-success" style="margin-right:4px"><i class="bi bi-check2"></i> ${d}</span>`).join('')}
             </div>
@@ -565,7 +570,7 @@ function renderVerification(container) {
 
 // ---- Selection Page ----
 function renderSelection(container) {
-  const eligible = DB.getAll('admissions').filter(a=>['terverifikasi','menunggu seleksi'].includes(a.status));
+  const eligible = getScopedAdmissions().filter(a=>['terverifikasi','menunggu seleksi'].includes(a.status));
   container.innerHTML = `
 <div class="page-container">
   <div class="page-header">
@@ -626,17 +631,17 @@ function renderSelection(container) {
 
 // ---- Daftar Ulang (PMB-010) ----
 function renderReRegistration(container) {
-  const campuses = DB.getAll('campuses');
-  const programs = DB.getAll('studyPrograms');
-  const queue = DB.getAll('admissions').filter(a => a.status === 'lulus seleksi');
-  const done = DB.getAll('admissions').filter(a => ['daftar ulang', 'menjadi mahasiswa'].includes(a.status));
+  const campuses = getScopedCampuses();
+  const programs = getScopedPrograms();
+  const queue = getScopedAdmissions().filter(a => a.status === 'lulus seleksi');
+  const done = getScopedAdmissions().filter(a => ['daftar ulang', 'menjadi mahasiswa'].includes(a.status));
 
   container.innerHTML = `
 <div class="page-container">
   <div class="page-header">
     <div class="page-header-info">
       <h1 class="page-title">Daftar Ulang</h1>
-      <p class="page-desc">Konfirmasi prodi, verifikasi pembayaran, dan catat daftar ulang · ${queue.length} menunggu</p>
+      <p class="page-desc">Konfirmasi prodi, verifikasi pembayaran, dan catat daftar ulang � ${queue.length} menunggu</p>
     </div>
     <div class="page-actions">
       <a href="#/admissions/convert" class="btn btn-accent"><i class="bi bi-person-plus"></i> Konversi ke Mahasiswa</a>
@@ -751,16 +756,16 @@ function renderReRegistration(container) {
 
 // ---- Konversi ke Mahasiswa (PMB-010) ----
 function renderConvert(container) {
-  const campuses = DB.getAll('campuses');
-  const queue = DB.getAll('admissions').filter(a => a.status === 'daftar ulang');
-  const converted = DB.getAll('admissions').filter(a => a.status === 'menjadi mahasiswa');
+  const campuses = getScopedCampuses();
+  const queue = getScopedAdmissions().filter(a => a.status === 'daftar ulang');
+  const converted = getScopedAdmissions().filter(a => a.status === 'menjadi mahasiswa');
 
   container.innerHTML = `
 <div class="page-container">
   <div class="page-header">
     <div class="page-header-info">
       <h1 class="page-title">Konversi ke Mahasiswa</h1>
-      <p class="page-desc">Bentuk data mahasiswa dan NIM dari pendaftar yang sudah daftar ulang · ${queue.length} antrean</p>
+      <p class="page-desc">Bentuk data mahasiswa dan NIM dari pendaftar yang sudah daftar ulang � ${queue.length} antrean</p>
     </div>
     <div class="page-actions">
       <a href="#/admissions/re-registration" class="btn btn-secondary"><i class="bi bi-clipboard-check"></i> Daftar Ulang</a>

@@ -6,9 +6,20 @@ import { DB } from '../data/seed.js';
 import { formatDate, statusBadge } from '../utils.js';
 import { DataTable } from '../components/data-table.js';
 import { showToast } from '../components/toast.js';
-import { renderStaffRegistration } from './registration.js';
-import { renderStaffKrsApproval } from './krs-approval.js';
-import { renderAdvisors } from './advisors.js';
+import { renderStaffRegistration } from './registration.js?v=20261025z';
+import { renderStaffKrsApproval } from './krs-approval.js?v=20261025z';
+import { renderAdvisors } from './advisors.js?v=20261025z';
+import { scopeRows, scopeCampuses, scopeFaculties, scopeStudyPrograms, scopeCourses } from '../campus-scope.js';
+
+const getVisibleCampuses = () => scopeCampuses(DB.getAll('campuses'));
+const getVisiblePrograms = () => scopeStudyPrograms(DB.getAll('studyPrograms'));
+const getVisibleFaculties = () => scopeFaculties(DB.getAll('faculties'), DB.getAll('studyPrograms'));
+const getVisibleCourses = () => scopeCourses(DB.getAll('courses'), DB.getAll('studyPrograms'));
+const getVisibleClasses = () => scopeRows(DB.getAll('classes'));
+const getVisibleLecturers = () => scopeRows(DB.getAll('lecturers'));
+const getVisibleStudents = () => scopeRows(DB.getAll('students'));
+const getVisibleTheses = () => scopeRows(DB.getAll('theses'));
+const getVisibleEmployees = () => scopeRows(DB.getAll('employees'));
 
 // ===================== ORGANIZATION =====================
 export function renderOrganization(path, container) {
@@ -24,7 +35,7 @@ export function renderOrganization(path, container) {
 function renderOrgProfile(container) {
   const f = DB.get('foundation');
   if (!f) { container.innerHTML = '<div class="page-container"><p>Data tidak tersedia.</p></div>'; return; }
-  const campuses = DB.getAll('campuses');
+  const campuses = getVisibleCampuses();
   container.innerHTML = `
 <div class="page-container">
   <div class="page-header">
@@ -52,7 +63,7 @@ function renderOrgProfile(container) {
 }
 
 function renderCampuses(container) {
-  const campuses = DB.getAll('campuses');
+  const campuses = getVisibleCampuses();
   container.innerHTML = `
 <div class="page-container">
   <div class="page-header">
@@ -74,8 +85,8 @@ function renderCampuses(container) {
 }
 
 function renderFaculties(container) {
-  const faculties = DB.getAll('faculties');
-  const campuses  = DB.getAll('campuses');
+  const faculties = getVisibleFaculties();
+  const campuses  = getVisibleCampuses();
   container.innerHTML = `
 <div class="page-container">
   <div class="page-header"><div class="page-header-info"><h1 class="page-title">Fakultas</h1></div><div class="page-actions"><button class="btn btn-accent" id="add-fac"><i class="bi bi-plus-lg"></i> Tambah Fakultas</button></div></div>
@@ -97,9 +108,9 @@ function renderFaculties(container) {
 }
 
 function renderStudyPrograms(container) {
-  const prodi = DB.getAll('studyPrograms');
-  const campuses = DB.getAll('campuses');
-  const faculties = DB.getAll('faculties');
+  const prodi = getVisiblePrograms();
+  const campuses = getVisibleCampuses();
+  const faculties = getVisibleFaculties();
   container.innerHTML = `
 <div class="page-container">
   <div class="page-header"><div class="page-header-info"><h1 class="page-title">Program Studi</h1><p class="page-desc">${prodi.length} program studi aktif</p></div><div class="page-actions"><button class="btn btn-accent" id="add-prodi"><i class="bi bi-plus-lg"></i> Tambah Prodi</button></div></div>
@@ -215,8 +226,8 @@ function renderAcademicEmptyState(title, description, detail) {
 }
 
 function renderCourses(container) {
-  const courses = DB.getAll('courses');
-  const prodi   = DB.getAll('studyPrograms');
+  const courses = getVisibleCourses();
+  const prodi   = getVisiblePrograms();
   container.innerHTML = `
 <div class="page-container">
   <div class="page-header"><div class="page-header-info"><h1 class="page-title">Mata Kuliah</h1><p class="page-desc">${courses.length} mata kuliah terdaftar</p></div><div class="page-actions"><button class="btn btn-accent" id="add-mk"><i class="bi bi-plus-lg"></i> Tambah MK</button></div></div>
@@ -239,9 +250,9 @@ function renderCourses(container) {
 }
 
 function renderClasses(container) {
-  const classes   = DB.getAll('classes');
-  const courses   = DB.getAll('courses');
-  const lecturers = DB.getAll('lecturers');
+  const classes   = getVisibleClasses();
+  const courses   = getVisibleCourses();
+  const lecturers = getVisibleLecturers();
   container.innerHTML = `
 <div class="page-container">
   <div class="page-header"><div class="page-header-info"><h1 class="page-title">Kelas Kuliah</h1></div><div class="page-actions"><button class="btn btn-accent"><i class="bi bi-plus-lg"></i> Buka Kelas</button></div></div>
@@ -264,8 +275,8 @@ function renderClasses(container) {
 }
 
 function renderCurriculum(container) {
-  const prodi = DB.getAll('studyPrograms');
-  const courses = DB.getAll('courses');
+  const prodi = getVisiblePrograms();
+  const courses = getVisibleCourses();
   const selected = prodi[0];
   container.innerHTML = `
 <div class="page-container">
@@ -304,7 +315,7 @@ function buildCurriculumView(prodi, allCourses) {
 }
 
 function renderCoursePrerequisites(container) {
-  const courses = DB.getAll('courses');
+  const courses = getVisibleCourses();
   const lookup = new Map(courses.map(item => [item.id, item]));
   const rows = courses
     .filter(item => item.prerequisite)
@@ -342,9 +353,9 @@ function renderCoursePrerequisites(container) {
 }
 
 function renderAcademicSchedule(container) {
-  const classes = DB.getAll('classes');
-  const courses = DB.getAll('courses');
-  const lecturers = DB.getAll('lecturers');
+  const classes = getVisibleClasses();
+  const courses = getVisibleCourses();
+  const lecturers = getVisibleLecturers();
   const rows = classes.map(item => ({
     code: item.code,
     course: courses.find(course => course.id === item.courseId)?.name || '-',
@@ -374,8 +385,8 @@ function renderAcademicSchedule(container) {
 }
 
 function renderAcademicEvaluation(container) {
-  const students = DB.getAll('students');
-  const campuses = DB.getAll('campuses');
+  const students = getVisibleStudents();
+  const campuses = getVisibleCampuses();
   const rows = campuses.map(campus => {
     const members = students.filter(item => item.campusId === campus.id);
     const avgIpk = members.reduce((sum, item) => sum + (item.ipk || 0), 0) / (members.length || 1);
@@ -415,9 +426,9 @@ export function renderLecturers(path, container) {
   if (path.includes('/certification')) return renderLecturerCertification(container);
   if (path.includes('/evaluation')) return renderLecturerEvaluation(container);
 
-  const lecturers = DB.getAll('lecturers');
-  const campuses  = DB.getAll('campuses');
-  const prodi     = DB.getAll('studyPrograms');
+  const lecturers = getVisibleLecturers();
+  const campuses  = getVisibleCampuses();
+  const prodi     = getVisiblePrograms();
   container.innerHTML = `
 <div class="page-container">
   <div class="page-header"><div class="page-header-info"><h1 class="page-title">Data Dosen</h1><p class="page-desc">${lecturers.length} dosen aktif</p></div><div class="page-actions"><button class="btn btn-accent"><i class="bi bi-plus-lg"></i> Tambah Dosen</button></div></div>
@@ -440,7 +451,7 @@ export function renderLecturers(path, container) {
 }
 
 function renderAcademicStaff(container) {
-  const employees = DB.getAll('employees').filter(item => /akademik|baak|registrar/i.test(`${item.unit} ${item.position}`));
+  const employees = getVisibleEmployees().filter(item => /akademik|baak|registrar/i.test(`${item.unit} ${item.position}`));
   container.innerHTML = `
 <div class="page-container">
   <div class="page-header"><div class="page-header-info"><h1 class="page-title">Tenaga Kependidikan</h1><p class="page-desc">Staf operasional akademik dan administrasi kampus</p></div></div>
@@ -461,9 +472,9 @@ function renderAcademicStaff(container) {
 }
 
 function renderLecturerAssignments(container) {
-  const lecturers = DB.getAll('lecturers');
-  const classes = DB.getAll('classes');
-  const courses = DB.getAll('courses');
+  const lecturers = getVisibleLecturers();
+  const classes = getVisibleClasses();
+  const courses = getVisibleCourses();
   const rows = lecturers.map(lecturer => {
     const teaching = classes.filter(item => item.lecturerId === lecturer.id);
     return {
@@ -495,8 +506,8 @@ function renderLecturerAssignments(container) {
 }
 
 function renderLecturerWorkload(container) {
-  const lecturers = DB.getAll('lecturers');
-  const classes = DB.getAll('classes');
+  const lecturers = getVisibleLecturers();
+  const classes = getVisibleClasses();
   const rows = lecturers.map(lecturer => {
     const teaching = classes.filter(item => item.lecturerId === lecturer.id);
     const totalStudents = teaching.reduce((sum, item) => sum + (item.enrolled || 0), 0);
@@ -528,7 +539,7 @@ function renderLecturerWorkload(container) {
 }
 
 function renderLecturerCertification(container) {
-  const lecturers = DB.getAll('lecturers');
+  const lecturers = getVisibleLecturers();
   const rows = lecturers.map((lecturer, index) => ({
     name: lecturer.name,
     nidn: lecturer.nidn,
@@ -556,7 +567,7 @@ function renderLecturerCertification(container) {
 }
 
 function renderLecturerEvaluation(container) {
-  const lecturers = DB.getAll('lecturers');
+  const lecturers = getVisibleLecturers();
   const rows = lecturers.map((lecturer, index) => ({
     name: lecturer.name,
     nidn: lecturer.nidn,
@@ -598,10 +609,12 @@ export function renderLearning(path, container) {
 }
 
 function renderKRS(container) {
-  const enrollments = DB.getAll('enrollments');
-  const students    = DB.getAll('students');
-  const classes     = DB.getAll('classes');
-  const courses     = DB.getAll('courses');
+  const students = getVisibleStudents();
+  const classes = getVisibleClasses();
+  const courses = getVisibleCourses();
+  const allowedStudentIds = new Set(students.map(item => item.id));
+  const allowedClassIds = new Set(classes.map(item => item.id));
+  const enrollments = DB.getAll('enrollments').filter(item => allowedStudentIds.has(item.studentId) && allowedClassIds.has(item.classId));
   container.innerHTML = `
 <div class="page-container">
   <div class="page-header"><div class="page-header-info"><h1 class="page-title">KRS — Semester Ganjil 2026/2027</h1><p class="page-desc">Kartu Rencana Studi</p></div></div>
@@ -634,8 +647,9 @@ function renderKRS(container) {
 }
 
 function renderAttendance(container) {
-  const classes   = DB.getAll('classes');
-  const students  = DB.getAll('students');
+  const classes = getVisibleClasses();
+  const courses = getVisibleCourses();
+  const students = getVisibleStudents();
   const attendances = DB.getAll('attendances');
   const cls = classes[0];
   if(!cls){container.innerHTML='<div class="page-container"><p>Tidak ada kelas.</p></div>';return;}
@@ -645,7 +659,7 @@ function renderAttendance(container) {
 <div class="page-container">
   <div class="page-header"><div class="page-header-info"><h1 class="page-title">Presensi Mahasiswa</h1></div></div>
   <div class="filter-bar" style="margin-bottom:1rem;border-radius:var(--radius-md)">
-    <select class="filter-select"><option>${cls.code} — ${DB.getAll('courses').find(c=>c.id===cls.courseId)?.name||''}</option></select>
+    <select class="filter-select"><option>${cls.code} — ${courses.find(c=>c.id===cls.courseId)?.name||''}</option></select>
     <button class="btn btn-success btn-sm ms-auto" id="save-att"><i class="bi bi-check2"></i> Simpan Presensi (Simulasi)</button>
   </div>
   <div class="card">
@@ -684,10 +698,11 @@ function renderAttendance(container) {
 }
 
 function renderGrades(container) {
-  const classes   = DB.getAll('classes');
-  const courses   = DB.getAll('courses');
-  const students  = DB.getAll('students');
-  const grades    = DB.getAll('grades');
+  const classes = getVisibleClasses();
+  const courses = getVisibleCourses();
+  const students = getVisibleStudents();
+  const allowedStudentIds = new Set(students.map(item => item.id));
+  const grades = DB.getAll('grades').filter(item => allowedStudentIds.has(item.studentId));
   const cls = classes[0];
   const course = courses.find(c=>c.id===cls?.courseId);
   const enrolled = students.slice(0,5);
@@ -721,10 +736,11 @@ function renderGrades(container) {
 }
 
 function renderTranscript(container) {
-  const students = DB.getAll('students');
-  const grades   = DB.getAll('grades').filter(g=>g.status==='final');
-  const courses  = DB.getAll('courses');
-  const s = students.find(x=>x.id==='stu-1');
+  const students = getVisibleStudents();
+  const allowedStudentIds = new Set(students.map(item => item.id));
+  const grades   = DB.getAll('grades').filter(g=>g.status==='final' && allowedStudentIds.has(g.studentId));
+  const courses  = getVisibleCourses();
+  const s = students.find(student => grades.some(grade => grade.studentId === student.id)) || students[0];
   if(!s){container.innerHTML='<div class="page-container"><p>Mahasiswa tidak ditemukan.</p></div>';return;}
   container.innerHTML = `
 <div class="page-container">
@@ -751,10 +767,11 @@ function renderTranscript(container) {
 }
 
 function renderKHS(container) {
-  const students = DB.getAll('students');
-  const grades   = DB.getAll('grades').filter(g=>g.semesterId==='sem-3');
-  const courses  = DB.getAll('courses');
-  const s = students.find(x=>x.id==='stu-1');
+  const students = getVisibleStudents();
+  const allowedStudentIds = new Set(students.map(item => item.id));
+  const grades   = DB.getAll('grades').filter(g=>g.semesterId==='sem-3' && allowedStudentIds.has(g.studentId));
+  const courses  = getVisibleCourses();
+  const s = students.find(student => grades.some(grade => grade.studentId === student.id)) || students[0];
   container.innerHTML = `
 <div class="page-container">
   <div class="page-header"><div class="page-header-info"><h1 class="page-title">Kartu Hasil Studi (KHS)</h1></div><div class="page-actions"><button class="btn btn-secondary" onclick="window.print()"><i class="bi bi-printer"></i> Cetak</button></div></div>
@@ -765,7 +782,7 @@ function renderKHS(container) {
         <table class="data-table">
           <thead><tr><th>Kode</th><th>Mata Kuliah</th><th>SKS</th><th>Nilai</th><th>Huruf</th><th>Mutu</th></tr></thead>
           <tbody>
-            ${grades.filter(g=>g.studentId==='stu-1').map(g=>{const co=courses.find(c=>c.id===g.courseId);return`<tr><td><code>${co?.code||'-'}</code></td><td>${co?.name||'-'}</td><td>${g.sks}</td><td>${g.finalScore?.toFixed(1)||'-'}</td><td><strong>${g.letterGrade||'-'}</strong></td><td>${(g.mutu||0).toFixed(1)}</td></tr>`;}).join('')}
+            ${grades.filter(g=>g.studentId===s?.id).map(g=>{const co=courses.find(c=>c.id===g.courseId);return`<tr><td><code>${co?.code||'-'}</code></td><td>${co?.name||'-'}</td><td>${g.sks}</td><td>${g.finalScore?.toFixed(1)||'-'}</td><td><strong>${g.letterGrade||'-'}</strong></td><td>${(g.mutu||0).toFixed(1)}</td></tr>`;}).join('')}
             <tr style="background:var(--color-gold-50);font-weight:var(--font-bold)"><td colspan="2">IP Semester</td><td>6</td><td colspan="2"></td><td>3.5</td></tr>
           </tbody>
         </table>
@@ -776,8 +793,8 @@ function renderKHS(container) {
 }
 
 function renderLearningAssignments(container) {
-  const classes = DB.getAll('classes');
-  const courses = DB.getAll('courses');
+  const classes = getVisibleClasses();
+  const courses = getVisibleCourses();
   const upcoming = classes.slice(0, 4).map((item, index) => ({
     classCode: item.code,
     course: courses.find(course => course.id === item.courseId)?.name || '-',
@@ -812,7 +829,7 @@ function renderLearningAssignments(container) {
 }
 
 function renderLearningEvaluation(container) {
-  const lecturers = DB.getAll('lecturers');
+  const lecturers = getVisibleLecturers();
   const rows = lecturers.slice(0, 6).map((lecturer, index) => ({
     lecturer: lecturer.name,
     courseLoad: lecturer.classCount,
@@ -848,9 +865,9 @@ export function renderThesis(path, container) {
 }
 
 function renderThesisOverview(container) {
-  const theses    = DB.getAll('theses');
-  const students  = DB.getAll('students');
-  const lecturers = DB.getAll('lecturers');
+  const theses    = getVisibleTheses();
+  const students  = getVisibleStudents();
+  const lecturers = getVisibleLecturers();
   container.innerHTML = `
 <div class="page-container">
   <div class="page-header"><div class="page-header-info"><h1 class="page-title">Skripsi & Tugas Akhir</h1><p class="page-desc">${theses.length} tugas akhir aktif</p></div><div class="page-actions"><button class="btn btn-accent"><i class="bi bi-plus-lg"></i> Ajukan Topik</button></div></div>
@@ -884,9 +901,9 @@ function renderThesisOverview(container) {
 }
 
 function renderThesisTopics(container) {
-  const theses = DB.getAll('theses');
-  const students = DB.getAll('students');
-  const prodi = DB.getAll('studyPrograms');
+  const theses = getVisibleTheses();
+  const students = getVisibleStudents();
+  const prodi = getVisiblePrograms();
   const rows = theses
     .filter(item => ['Pengajuan Topik', 'Proposal'].includes(item.stage) || item.status === 'menunggu review')
     .map(item => ({
@@ -918,9 +935,9 @@ function renderThesisTopics(container) {
 }
 
 function renderThesisSupervision(container) {
-  const theses = DB.getAll('theses');
-  const students = DB.getAll('students');
-  const lecturers = DB.getAll('lecturers');
+  const theses = getVisibleTheses();
+  const students = getVisibleStudents();
+  const lecturers = getVisibleLecturers();
   const rows = theses
     .filter(item => ['Bimbingan', 'Seminar'].includes(item.stage))
     .map(item => ({
@@ -950,9 +967,9 @@ function renderThesisSupervision(container) {
 }
 
 function renderThesisDefense(container) {
-  const theses = DB.getAll('theses');
-  const students = DB.getAll('students');
-  const lecturers = DB.getAll('lecturers');
+  const theses = getVisibleTheses();
+  const students = getVisibleStudents();
+  const lecturers = getVisibleLecturers();
   const rows = theses
     .filter(item => ['Seminar', 'Sidang', 'Selesai'].includes(item.stage))
     .map(item => ({

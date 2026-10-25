@@ -4,11 +4,12 @@
  */
 
 import { DB } from '../data/seed.js';
-import { AppState } from '../state.js';
+import { AppState } from '../state.js?v=20261025ab';
 import { formatDate, formatDateTime, generateId, statusBadge } from '../utils.js';
 import { showToast, showConfirm } from '../components/toast.js';
 import { openModal, openFormModal } from '../components/modal.js';
 import { DataTable } from '../components/data-table.js';
+import { scopeRows, scopeStudyPrograms } from '../campus-scope.js';
 import {
   getPolicy,
   savePlan,
@@ -27,11 +28,11 @@ function esc(s) {
 
 function getLecturer() {
   const role = AppState.currentRole;
-  return DB.getAll('lecturers').find(l => l.id === (role.lecturerId || 'lec-1'));
+  return scopeRows(DB.getAll('lecturers')).find(l => l.id === (role.lecturerId || 'lec-1'));
 }
 
 function adviseesOf(lecturerId) {
-  return DB.getAll('students').filter(s => s.advisor === lecturerId);
+  return scopeRows(DB.getAll('students')).filter(s => s.advisor === lecturerId);
 }
 
 function planOf(studentId, semesterId = 'sem-1') {
@@ -68,7 +69,7 @@ function notifyStudent(student, title, message) {
 
 function buildAdviseeRows(lecturerId) {
   const students = adviseesOf(lecturerId);
-  const studyPrograms = DB.getAll('studyPrograms');
+  const studyPrograms = scopeStudyPrograms(DB.getAll('studyPrograms'));
   return students.map(s => {
     const plan = planOf(s.id);
     const ips = calcIpsLast(s.id);
@@ -120,7 +121,7 @@ export function renderAdvisorKrsApproval(path, container) {
   <div class="page-header">
     <div class="page-header-info">
       <h1 class="page-title">Persetujuan KRS</h1>
-      <p class="page-desc">Mahasiswa bimbingan Â· ${esc(lecturer.name)} Â· ${pending} menunggu persetujuan</p>
+      <p class="page-desc">Mahasiswa bimbingan · ${esc(lecturer.name)} · ${pending} menunggu persetujuan</p>
     </div>
     <div class="page-actions">
       <a href="#/portal/lecturer" class="btn btn-secondary"><i class="bi bi-house"></i> Portal</a>
@@ -144,7 +145,7 @@ export function renderAdvisorKrsApproval(path, container) {
   <div class="info-box" style="margin-bottom:1rem">
     <i class="bi bi-info-circle"></i>
     Hanya mahasiswa dengan dosen wali <strong>${esc(lecturer.name)}</strong>.
-    Persetujuan ${policy.advisorApprovalRequired ? 'wajib' : 'tidak wajib'} Â· Finalisasi: <strong>${esc(policy.finalizeOn || 'period_lock')}</strong>.
+    Persetujuan ${policy.advisorApprovalRequired ? 'wajib' : 'tidak wajib'} · Finalisasi: <strong>${esc(policy.finalizeOn || 'period_lock')}</strong>.
   </div>
 
   <div class="filter-bar" style="margin-bottom:0;border-radius:var(--radius-lg) var(--radius-lg) 0 0">
@@ -238,7 +239,7 @@ function renderAdvisorDetail(container, lecturer, studentId) {
   <div class="page-header">
     <div class="page-header-info">
       <h1 class="page-title">Detail KRS â€” ${esc(student.nim)}</h1>
-      <p class="page-desc">${esc(student.name)} Â· ${esc(prodi?.name || '-')} Â· Angkatan ${student.angkatan}</p>
+      <p class="page-desc">${esc(student.name)} · ${esc(prodi?.name || '-')} · Angkatan ${student.angkatan}</p>
     </div>
     <div class="page-actions">
       <a href="#/portal/lecturer/krs" class="btn btn-secondary"><i class="bi bi-arrow-left"></i> Daftar</a>
@@ -264,7 +265,7 @@ function renderAdvisorDetail(container, lecturer, studentId) {
                 <td>${i.sks}</td>
                 <td>${esc(i.classCode || '-')}</td>
                 <td>${esc(i.lecturerName || DB.getById('lecturers', i.lecturerId)?.name || '-')}</td>
-                <td>${esc(i.day || '-')} ${esc(i.startTime || '')}â€“${esc(i.endTime || '')}</td>
+                <td>${esc(i.day || '-')} ${esc(i.startTime || '')}–${esc(i.endTime || '')}</td>
                 <td>${esc(i.room || '-')}</td>
               </tr>`).join('') : `<tr><td colspan="7"><div class="empty-state" style="padding:1rem"><div class="empty-state-desc">Belum ada mata kuliah.</div></div></td></tr>`}
             </tbody>
@@ -381,7 +382,7 @@ async function approvePlan(student, plan, lecturer, refresh) {
   plan.advisorNote = '';
   savePlan(plan);
   syncEnrollments(plan);
-  DB.log('KRS: Setujui', 'Persetujuan KRS', `${student.nim}: ${from} â†’ ${next}`);
+  DB.log('KRS: Setujui', 'Persetujuan KRS', `${student.nim}: ${from} ? ${next}`);
   notifyStudent(student, 'KRS disetujui', `Dosen wali menyetujui KRS Anda. Status: ${next}.`);
   showToast(`KRS disetujui (${next}).`, 'success');
   refresh();
@@ -413,7 +414,7 @@ function revisePlan(student, plan, lecturer, refresh) {
       plan.advisorNote = data.note;
       savePlan(plan);
       syncEnrollments(plan);
-      DB.log('KRS: Revisi', 'Persetujuan KRS', `${student.nim}: ${from} â†’ Perlu Revisi`);
+      DB.log('KRS: Revisi', 'Persetujuan KRS', `${student.nim}: ${from} ? Perlu Revisi`);
       notifyStudent(student, 'KRS perlu revisi', data.note);
       close();
       showToast('KRS dikembalikan untuk revisi.', 'warning');
@@ -426,10 +427,11 @@ function revisePlan(student, plan, lecturer, refresh) {
 
 export function renderStaffKrsApproval(path, container) {
   const policy = getPolicy();
-  const plans = DB.getAll('krsPlans');
-  const students = DB.getAll('students');
-  const lecturers = DB.getAll('lecturers');
-  const studyPrograms = DB.getAll('studyPrograms');
+  const students = scopeRows(DB.getAll('students'));
+  const lecturers = scopeRows(DB.getAll('lecturers'));
+  const studyPrograms = scopeStudyPrograms(DB.getAll('studyPrograms'));
+  const allowedStudentIds = new Set(students.map(item => item.id));
+  const plans = DB.getAll('krsPlans').filter(item => allowedStudentIds.has(item.studentId));
   const waiting = plans.filter(p => p.status === WAITING).length;
   const approved = plans.filter(p => p.status === 'Disetujui').length;
 
@@ -451,7 +453,7 @@ export function renderStaffKrsApproval(path, container) {
   <div class="page-header">
     <div class="page-header-info">
       <h1 class="page-title">Persetujuan KRS</h1>
-      <p class="page-desc">Antrean BAAK Â· keputusan dosen wali ada di portal dosen Â· ${waiting} menunggu wali</p>
+      <p class="page-desc">Antrean BAAK · keputusan dosen wali ada di portal dosen · ${waiting} menunggu wali</p>
     </div>
     <div class="page-actions">
       ${approved > 0 && (policy.finalizeOn || 'period_lock') === 'period_lock' ? `
@@ -521,7 +523,7 @@ export function renderStaffKrsApproval(path, container) {
   });
 
   document.getElementById('krs-lock-period')?.addEventListener('click', async () => {
-    const toLock = DB.getAll('krsPlans').filter(p => p.status === 'Disetujui');
+    const toLock = DB.getAll('krsPlans').filter(p => allowedStudentIds.has(p.studentId) && p.status === 'Disetujui');
     if (!toLock.length) {
       showToast('Tidak ada KRS berstatus Disetujui.', 'info');
       return;
@@ -540,7 +542,7 @@ export function renderStaffKrsApproval(path, container) {
       savePlan(p);
       syncEnrollments(p);
     });
-    DB.log('KRS: Kunci Periode', 'Persetujuan KRS', `${toLock.length} rencana â†’ Final`);
+    DB.log('KRS: Kunci Periode', 'Persetujuan KRS', `${toLock.length} rencana ? Final`);
     showToast(`${toLock.length} KRS dikunci menjadi Final.`, 'success');
     renderStaffKrsApproval(path, container);
   });
@@ -565,7 +567,7 @@ function openStaffDetail(row) {
               <td>${esc(i.name)}</td>
               <td>${i.sks}</td>
               <td>${esc(i.classCode || '-')}</td>
-              <td>${esc(i.day || '-')} ${esc(i.startTime || '')}â€“${esc(i.endTime || '')}</td>
+              <td>${esc(i.day || '-')} ${esc(i.startTime || '')}–${esc(i.endTime || '')}</td>
             </tr>`).join('') || '<tr><td colspan="5">Kosong</td></tr>'}
           </tbody>
         </table>

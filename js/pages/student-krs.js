@@ -1,13 +1,14 @@
 /**
  * SIAKAD â€” Portal Mahasiswa: Isi KRS, KRS Saya, Cetak KRS
- * Sesuai design.md bagian 8.3â€“8.7
+ * Sesuai design.md bagian 8.3–8.7
  */
 
 import { DB } from '../data/seed.js';
-import { AppState } from '../state.js';
+import { AppState } from '../state.js?v=20261025ab';
 import { formatDate, formatDateTime, generateId, statusBadge } from '../utils.js';
 import { showToast, showConfirm } from '../components/toast.js';
 import { openModal } from '../components/modal.js';
+import { scopeRows } from '../campus-scope.js';
 
 const DAYS = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
 const EDITABLE = ['Draft', 'Perlu Revisi', 'Belum Dibuat'];
@@ -18,7 +19,7 @@ function esc(s) {
 
 function getStudent() {
   const role = AppState.currentRole;
-  return DB.getAll('students').find(s => s.id === (role.studentId || 'stu-1'));
+  return scopeRows(DB.getAll('students')).find(s => s.id === (role.studentId || 'stu-1'));
 }
 
 export function getPolicy() {
@@ -206,7 +207,7 @@ function validateAdd(student, plan, cls, course, policy) {
   for (const item of plan.items || []) {
     if (item.day === cls.day && rangesOverlap(item.startTime, item.endTime, cls.startTime, cls.endTime)) {
       errors.push({
-        msg: `Bentrok jadwal dengan ${item.code} (${item.day} ${item.startTime}â€“${item.endTime}) dan ${course.code} (${cls.day} ${cls.startTime}â€“${cls.endTime}).`,
+        msg: `Bentrok jadwal dengan ${item.code} (${item.day} ${item.startTime}–${item.endTime}) dan ${course.code} (${cls.day} ${cls.startTime}–${cls.endTime}).`,
       });
     }
   }
@@ -307,7 +308,7 @@ function sksMeter(total, max) {
 export function renderStudentKrsEdit(path, container) {
   const student = getStudent();
   if (!student) {
-    container.innerHTML = '<div class="page-container"><p>Data mahasiswa tidak ditemukan.</p></div>';
+    container.innerHTML = '<div class="page-container"><p>Data mahasiswa tidak ditemukan untuk kampus yang sedang dipilih.</p></div>';
     return;
   }
 
@@ -331,7 +332,7 @@ export function renderStudentKrsEdit(path, container) {
   <div class="page-header">
     <div class="page-header-info">
       <h1 class="page-title">Isi KRS</h1>
-      <p class="page-desc">${semester?.name || 'Semester aktif'} Â· Prototype demo</p>
+      <p class="page-desc">${semester?.name || 'Semester aktif'} · Prototype demo</p>
     </div>
     <div class="page-actions">
       <a href="#/portal/student/krs" class="btn btn-secondary"><i class="bi bi-journal-text"></i> KRS Saya</a>
@@ -349,7 +350,7 @@ export function renderStudentKrsEdit(path, container) {
       <div><span class="krs-sum-label">Status KRS</span><span class="badge badge-info" id="krs-status-badge">${esc(plan.status)}</span></div>
     </div>
     <div class="krs-sks-block">
-      <div class="krs-sks-text">${esc(meter.label)} Â· Batas berdasarkan IPS demo</div>
+      <div class="krs-sks-text">${esc(meter.label)} · Batas berdasarkan IPS demo</div>
       <div class="krs-sks-bar"><div class="krs-sks-fill krs-sks-${meter.tone}" style="width:${meter.pct}%"></div></div>
     </div>
     ${plan.advisorNote ? `<div class="info-box info-box-warning" style="margin-top:0.75rem"><i class="bi bi-chat-left-text"></i> <strong>Catatan dosen wali:</strong> ${esc(plan.advisorNote)}</div>` : ''}
@@ -406,7 +407,7 @@ export function renderStudentKrsEdit(path, container) {
           <button type="button" class="btn btn-warning btn-block" id="krs-cancel" ${plan.status === 'Menunggu Persetujuan Dosen Wali' && policy.allowCancelSubmission ? '' : 'disabled'} title="${policy.allowCancelSubmission ? '' : 'Kebijakan demo tidak mengizinkan batal pengajuan'}"><i class="bi bi-x-circle"></i> Batalkan Pengajuan</button>
           <a class="btn btn-secondary btn-block ${['Disetujui', 'Final'].includes(plan.status) || (policy.allowPrintBeforeFinal && plan.status === 'Disetujui') ? '' : 'disabled'}" href="#/portal/student/krs/print" id="krs-print-link"><i class="bi bi-printer"></i> Cetak KRS</a>
         </div>
-        <p class="krs-policy-note">Kebijakan demo: registrasi ${policy.requireRegistrationBeforeKrs ? 'wajib' : 'tidak wajib'} sebelum KRS Â· persetujuan dosen wali ${policy.advisorApprovalRequired ? 'wajib' : 'tidak wajib'}.</p>
+        <p class="krs-policy-note">Kebijakan demo: registrasi ${policy.requireRegistrationBeforeKrs ? 'wajib' : 'tidak wajib'} sebelum KRS · persetujuan dosen wali ${policy.advisorApprovalRequired ? 'wajib' : 'tidak wajib'}.</p>
       </div>
     </aside>
   </div>
@@ -419,7 +420,7 @@ export function renderStudentKrsEdit(path, container) {
 }
 
 function availableClasses(student, policy) {
-  return DB.getAll('classes').filter(cl => {
+  return scopeRows(DB.getAll('classes')).filter(cl => {
     if (cl.semesterId !== 'sem-1' || cl.status !== 'aktif') return false;
     if (cl.campusId && cl.campusId !== student.campusId) return false;
     if (!policy.allowCrossProdi && cl.prodiId && cl.prodiId !== student.prodiId) return false;
@@ -429,7 +430,7 @@ function availableClasses(student, policy) {
 
 function renderCourseTable(container, student, plan, policy, filters) {
   const passed = passedCourseIds(student.id);
-  const lecturers = DB.getAll('lecturers');
+  const lecturers = scopeRows(DB.getAll('lecturers'));
   let rows = availableClasses(student, policy).map(cl => {
     const course = DB.getById('courses', cl.courseId);
     const lec = lecturers.find(l => l.id === cl.lecturerId);
@@ -479,7 +480,7 @@ function renderCourseTable(container, student, plan, policy, filters) {
         <td>${r.course?.semester ?? '-'}</td>
         <td>${esc(r.cl.code)}</td>
         <td>${esc(r.lec?.name || '-')}</td>
-        <td>${esc(r.cl.day)} ${esc(r.cl.startTime)}â€“${esc(r.cl.endTime)}</td>
+        <td>${esc(r.cl.day)} ${esc(r.cl.startTime)}–${esc(r.cl.endTime)}</td>
         <td>${esc(r.cl.room)}</td>
         <td><span class="badge ${r.seat.cls}">${esc(r.seat.text)}</span></td>
         <td><span class="krs-prereq krs-prereq-${r.pre.tone}"><i class="bi ${r.pre.icon}" aria-hidden="true"></i> ${esc(r.pre.text)}</span></td>
@@ -508,8 +509,8 @@ function renderDraftList(container, student, plan, policy) {
   el.innerHTML = items.map(i => `
     <div class="krs-draft-item" id="draft-${i.classId}">
       <div>
-        <strong>${esc(i.code)}</strong> Â· ${esc(i.name)}
-        <div class="krs-draft-meta">${i.sks} SKS Â· ${esc(i.classCode)} Â· ${esc(i.day)} ${esc(i.startTime)}â€“${esc(i.endTime)}</div>
+        <strong>${esc(i.code)}</strong> · ${esc(i.name)}
+        <div class="krs-draft-meta">${i.sks} SKS · ${esc(i.classCode)} · ${esc(i.day)} ${esc(i.startTime)}–${esc(i.endTime)}</div>
       </div>
       <button type="button" class="btn btn-danger btn-sm" data-remove="${i.classId}" ${editable ? '' : 'disabled'} title="Hapus"><i class="bi bi-trash"></i></button>
     </div>`).join('');
@@ -540,7 +541,7 @@ function renderWeekGrid(container, plan) {
       ${dayItems.length ? dayItems.map(i => `
         <div class="krs-week-slot ${conflictIds.has(i.classId) ? 'conflict' : ''}">
           <strong>${esc(i.code)}</strong>
-          <span>${esc(i.startTime)}â€“${esc(i.endTime)}</span>
+          <span>${esc(i.startTime)}–${esc(i.endTime)}</span>
           <span>${esc(i.room)}</span>
           ${conflictIds.has(i.classId) ? '<span class="krs-conflict-label">Bentrok</span>' : ''}
         </div>`).join('') : '<div class="krs-week-empty">â€”</div>'}
@@ -576,7 +577,7 @@ function refreshEdit(container, student, plan, policy) {
     fill.style.width = `${meter.pct}%`;
     fill.className = `krs-sks-fill krs-sks-${meter.tone}`;
   }
-  if (text) text.textContent = `${meter.label} Â· Batas berdasarkan IPS demo`;
+  if (text) text.textContent = `${meter.label} · Batas berdasarkan IPS demo`;
   const badge = container.querySelector('#krs-status-badge');
   if (badge) badge.textContent = plan.status;
   renderCourseTable(container, student, plan, policy, filters);
@@ -649,9 +650,9 @@ function bindRowActions(container, student, plan, policy) {
           <div class="stat-row"><span class="stat-row-label">Prasyarat</span><span class="stat-row-value">${preCourse ? `${preCourse.code} â€” ${pre.text}` : pre.text}</span></div>
           <div class="stat-row"><span class="stat-row-label">Kelas</span><span class="stat-row-value">${esc(cls?.code)}</span></div>
           <div class="stat-row"><span class="stat-row-label">Dosen</span><span class="stat-row-value">${esc(lec?.name)}</span></div>
-          <div class="stat-row"><span class="stat-row-label">Jadwal</span><span class="stat-row-value">${esc(cls?.day)} ${esc(cls?.startTime)}â€“${esc(cls?.endTime)}</span></div>
+          <div class="stat-row"><span class="stat-row-label">Jadwal</span><span class="stat-row-value">${esc(cls?.day)} ${esc(cls?.startTime)}–${esc(cls?.endTime)}</span></div>
           <div class="stat-row"><span class="stat-row-label">Ruang</span><span class="stat-row-value">${esc(cls?.room)}</span></div>
-          <div class="stat-row"><span class="stat-row-label">Kapasitas</span><span class="stat-row-value">${cls?.enrolled}/${cls?.capacity} Â· sisa ${seatsLeft(cls, plan.id)}</span></div>`,
+          <div class="stat-row"><span class="stat-row-label">Kapasitas</span><span class="stat-row-value">${cls?.enrolled}/${cls?.capacity} · sisa ${seatsLeft(cls, plan.id)}</span></div>`,
       });
     };
   });
@@ -713,7 +714,7 @@ function bindKrsEdit(container, student, plan, policy) {
     if (next === 'Disetujui') plan.decidedAt = plan.submittedAt;
     savePlan(plan);
     syncEnrollments(plan);
-    DB.log('KRS: Ajukan', 'KRS', `${student.nim} â†’ ${next}`);
+    DB.log('KRS: Ajukan', 'KRS', `${student.nim} ? ${next}`);
     const notifs = DB.getAll('notifications');
     notifs.unshift({
       id: generateId('notif'),
@@ -757,7 +758,7 @@ function bindKrsEdit(container, student, plan, policy) {
 export function renderStudentKrsView(path, container) {
   const student = getStudent();
   if (!student) {
-    container.innerHTML = '<div class="page-container"><p>Data mahasiswa tidak ditemukan.</p></div>';
+    container.innerHTML = '<div class="page-container"><p>Data mahasiswa tidak ditemukan untuk kampus yang sedang dipilih.</p></div>';
     return;
   }
   const plan = getOrCreatePlan(student.id);
@@ -774,7 +775,7 @@ export function renderStudentKrsView(path, container) {
   <div class="page-header">
     <div class="page-header-info">
       <h1 class="page-title">KRS Saya</h1>
-      <p class="page-desc">${esc(student.name)} Â· ${esc(student.nim)} Â· ${esc(prodi?.name || '')}</p>
+      <p class="page-desc">${esc(student.name)} · ${esc(student.nim)} · ${esc(prodi?.name || '')}</p>
     </div>
     <div class="page-actions">
       <a href="#/portal/student/krs/edit" class="btn btn-accent ${canEdit ? '' : 'disabled'}"><i class="bi bi-pencil-square"></i> Isi / Ubah KRS</a>
@@ -811,7 +812,7 @@ export function renderStudentKrsView(path, container) {
               <td>${i.sks}</td>
               <td>${esc(i.classCode)}</td>
               <td>${esc(lec)}</td>
-              <td>${esc(i.day)} ${esc(i.startTime)}â€“${esc(i.endTime)}</td>
+              <td>${esc(i.day)} ${esc(i.startTime)}–${esc(i.endTime)}</td>
               <td>${esc(i.room)}</td>
             </tr>`;
           }).join('') : `<tr><td colspan="7"><div class="empty-state" style="padding:1.5rem"><div class="empty-state-title">Belum ada mata kuliah</div><div class="empty-state-desc"><a href="#/portal/student/krs/edit">Isi KRS</a> untuk menambah kelas.</div></div></td></tr>`}
@@ -828,7 +829,7 @@ export function renderStudentKrsView(path, container) {
         <div class="activity-item">
           <div class="activity-icon" style="background:var(--color-navy-100);color:var(--color-navy-800)"><i class="bi bi-clock-history"></i></div>
           <div class="activity-body">
-            <div class="activity-text"><strong>${esc(h.from)}</strong> â†’ <strong>${esc(h.to)}</strong> Â· ${esc(h.by)}${h.note ? ` â€” ${esc(h.note)}` : ''}</div>
+            <div class="activity-text"><strong>${esc(h.from)}</strong> ? <strong>${esc(h.to)}</strong> · ${esc(h.by)}${h.note ? ` â€” ${esc(h.note)}` : ''}</div>
             <div class="activity-time">${formatDateTime(h.at)}</div>
           </div>
         </div>`).join('') : `<p class="krs-policy-note">Belum ada riwayat.</p>`}
@@ -846,7 +847,7 @@ export function renderStudentKrsView(path, container) {
 export function renderStudentKrsPrint(path, container) {
   const student = getStudent();
   if (!student) {
-    container.innerHTML = '<div class="page-container"><p>Data mahasiswa tidak ditemukan.</p></div>';
+    container.innerHTML = '<div class="page-container"><p>Data mahasiswa tidak ditemukan untuk kampus yang sedang dipilih.</p></div>';
     return;
   }
   const plan = getOrCreatePlan(student.id);
@@ -896,17 +897,17 @@ export function renderStudentKrsPrint(path, container) {
         ${(plan.items || []).map(i => `<tr>
           <td>${esc(i.code)}</td><td>${esc(i.name)}</td><td>${i.sks}</td><td>${esc(i.classCode)}</td>
           <td>${esc(i.lecturerName || DB.getById('lecturers', i.lecturerId)?.name || '-')}</td>
-          <td>${esc(i.day)} ${esc(i.startTime)}â€“${esc(i.endTime)} Â· ${esc(i.room)}</td>
+          <td>${esc(i.day)} ${esc(i.startTime)}–${esc(i.endTime)} · ${esc(i.room)}</td>
         </tr>`).join('')}
       </tbody>
       <tfoot><tr><td colspan="2">Total SKS</td><td colspan="4">${total}</td></tr></tfoot>
     </table>
     <p>Dosen wali: <strong>${esc(advisor?.name || 'â€”')}</strong>
-      ${plan.decidedAt ? ` Â· Disetujui: ${formatDate(plan.decidedAt)}` : ''}</p>
+      ${plan.decidedAt ? ` · Disetujui: ${formatDate(plan.decidedAt)}` : ''}</p>
     <div class="krs-print-sign">
       <div>Mahasiswa<br><br><br><u>${esc(student.name)}</u></div>
-      <div>Dosen Wali<br><br><br><u>${esc(advisor?.name || 'â€¦â€¦â€¦â€¦â€¦â€¦')}</u></div>
-      <div>BAAK<br><br><br><u>â€¦â€¦â€¦â€¦â€¦â€¦</u></div>
+      <div>Dosen Wali<br><br><br><u>${esc(advisor?.name || '………………')}</u></div>
+      <div>BAAK<br><br><br><u>………………</u></div>
     </div>
     <p class="krs-print-foot">Dokumen prototype SIAKAD Cakrawala â€” bukan dokumen resmi kampus. Dicetak ${formatDateTime(new Date().toISOString())}.</p>
   </div>

@@ -8,8 +8,9 @@ import { DB } from '../data/seed.js';
 import { formatDate, generateId, statusBadge, today, escapeHtml } from '../utils.js';
 import { showToast } from '../components/toast.js';
 import { openFormModal, openModal } from '../components/modal.js';
-import { countPendingForAdvisor } from './krs-approval.js';
-import { Router } from '../router.js';
+import { countPendingForAdvisor } from './krs-approval.js?v=20261025z';
+import { Router } from '../router.js?v=20261025aa';
+import { scopeRows, scopeStudyPrograms, scopeCourses } from '../campus-scope.js';
 
 const esc = escapeHtml;
 const RISK_IPK = 2.0;
@@ -18,7 +19,7 @@ const RISK_ATTEND = 75;
 /* ═══════════════ LEC-036 — akses & sumber kanonis ═══════════════ */
 
 export function getLecturerClasses(lecturerId) {
-  return DB.getAll('classes').filter(c => c.lecturerId === lecturerId);
+  return scopeRows(DB.getAll('classes')).filter(c => c.lecturerId === lecturerId);
 }
 
 export function canAccessClass(lecturerId, classId) {
@@ -34,7 +35,8 @@ export function getOfficialRoster(classId) {
 }
 
 export function getActiveAdvisees(lecturerId) {
-  return DB.getAll('advisorAssignments').filter(a => a.lecturerId === lecturerId && a.status === 'aktif');
+  const allowedStudentIds = new Set(scopeRows(DB.getAll('students')).map(item => item.id));
+  return DB.getAll('advisorAssignments').filter(a => a.lecturerId === lecturerId && a.status === 'aktif' && allowedStudentIds.has(a.studentId));
 }
 
 export function assertAdvisee(lecturerId, studentId) {
@@ -46,10 +48,10 @@ export function lectureAudit(action, object, detail = '') {
 }
 
 function courseName(id) {
-  return DB.getById('courses', id)?.name || DB.getAll('courses').find(c => c.id === id)?.name || '-';
+  return DB.getById('courses', id)?.name || scopeCourses(DB.getAll('courses'), DB.getAll('studyPrograms')).find(c => c.id === id)?.name || '-';
 }
 function prodiName(id) {
-  return DB.getAll('studyPrograms').find(p => p.id === id)?.name || '-';
+  return scopeStudyPrograms(DB.getAll('studyPrograms')).find(p => p.id === id)?.name || '-';
 }
 function classLabel(cl) {
   if (!cl) return '-';
@@ -91,7 +93,7 @@ function refreshPortal(hash) {
 
 export function buildAcademicAdvisorPage(lecturer) {
   const assignments = getActiveAdvisees(lecturer.id);
-  const students = DB.getAll('students');
+  const students = scopeRows(DB.getAll('students'));
   const pending = countPendingForAdvisor(lecturer.id);
   const classIds = getLecturerClasses(lecturer.id).map(c => c.id);
   const consultations = DB.getAll('advisingConsultations').filter(c => c.lecturerId === lecturer.id);
@@ -166,7 +168,7 @@ export function buildAcademicAdvisorPage(lecturer) {
 
 export function buildAdvisingPage(lecturer) {
   const assignments = getActiveAdvisees(lecturer.id);
-  const students = DB.getAll('students');
+  const students = scopeRows(DB.getAll('students'));
   const consultations = DB.getAll('advisingConsultations').filter(c => c.lecturerId === lecturer.id);
   const pending = countPendingForAdvisor(lecturer.id);
 
@@ -424,7 +426,8 @@ function announcementForm(lecturer, classes, existing = null) {
 
 export function buildReportsPage(lecturer, classes) {
   const attendances = DB.getAll('attendances');
-  const grades = DB.getAll('grades');
+  const allowedStudentIds = new Set(scopeRows(DB.getAll('students')).map(item => item.id));
+  const grades = DB.getAll('grades').filter(item => allowedStudentIds.has(item.studentId));
   const assignments = DB.getAll('classAssignments').filter(a => a.lecturerId === lecturer.id);
   const submissions = DB.getAll('assignmentSubmissions');
 
@@ -458,7 +461,8 @@ export function buildReportsPage(lecturer, classes) {
     return { a, cl, onTime, late, missing, total: roster.length };
   }).filter(Boolean);
 
-  const totalSks = classes.reduce((s, cl) => s + (DB.getAll('courses').find(c => c.id === cl.courseId)?.sks || 0), 0);
+  const visibleCourses = scopeCourses(DB.getAll('courses'), DB.getAll('studyPrograms'));
+  const totalSks = classes.reduce((s, cl) => s + (visibleCourses.find(c => c.id === cl.courseId)?.sks || 0), 0);
   const totalMhs = classes.reduce((s, cl) => s + getOfficialRoster(cl.id).length, 0);
 
   return `
@@ -554,13 +558,14 @@ function buildAuditTable(lecturer) {
 }
 
 function exportReportsCsv(lecturer, classes) {
+  const allowedStudentIds = new Set(scopeRows(DB.getAll('students')).map(item => item.id));
   const lines = [['Kelas', 'Mata Kuliah', 'Roster', 'PresensiHadir%', 'NilaiRata2']];
   classes.forEach(cl => {
     if (!canAccessClass(lecturer.id, cl.id)) return;
     const rows = DB.getAll('attendances').filter(a => a.classId === cl.id);
     const hadir = rows.filter(a => a.status === 'hadir').length;
     const pct = rows.length ? Math.round((hadir / rows.length) * 100) : 0;
-    const gs = DB.getAll('grades').filter(g => g.courseId === cl.courseId && g.finalScore != null);
+    const gs = DB.getAll('grades').filter(g => allowedStudentIds.has(g.studentId) && g.courseId === cl.courseId && g.finalScore != null);
     const avg = gs.length ? (gs.reduce((s, g) => s + g.finalScore, 0) / gs.length).toFixed(1) : '';
     lines.push([cl.code, courseName(cl.courseId), String(getOfficialRoster(cl.id).length), String(pct), avg]);
   });

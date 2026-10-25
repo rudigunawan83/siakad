@@ -191,6 +191,11 @@ export const enrollments = [
   { id: 'enr-5', studentId: 'stu-3', classId: 'cls-2', semesterId: 'sem-1', status: 'diajukan', approvedBy: null, approvedAt: null },
   // stu-6 enrollments
   { id: 'enr-6', studentId: 'stu-6', classId: 'cls-4', semesterId: 'sem-1', status: 'disetujui', approvedBy: 'lec-4', approvedAt: '2026-09-06' },
+  // cls-10 — Metode Penelitian (lec-1)
+  { id: 'enr-7', studentId: 'stu-1', classId: 'cls-10', semesterId: 'sem-1', status: 'disetujui', approvedBy: 'lec-1', approvedAt: '2026-09-05' },
+  { id: 'enr-8', studentId: 'stu-2', classId: 'cls-10', semesterId: 'sem-1', status: 'disetujui', approvedBy: 'lec-1', approvedAt: '2026-09-05' },
+  { id: 'enr-9', studentId: 'stu-4', classId: 'cls-10', semesterId: 'sem-1', status: 'disetujui', approvedBy: 'lec-1', approvedAt: '2026-09-06' },
+  { id: 'enr-10', studentId: 'stu-9', classId: 'cls-10', semesterId: 'sem-1', status: 'disetujui', approvedBy: 'lec-1', approvedAt: '2026-09-06' },
 ];
 
 export const attendances = [
@@ -204,6 +209,12 @@ export const attendances = [
   { id: 'att-8', classId: 'cls-3', studentId: 'stu-1', date: '2026-09-23', status: 'sakit' },
   { id: 'att-9', classId: 'cls-4', studentId: 'stu-6', date: '2026-09-15', status: 'hadir' },
   { id: 'att-10', classId: 'cls-4', studentId: 'stu-6', date: '2026-09-22', status: 'hadir' },
+  { id: 'att-11', classId: 'cls-3', studentId: 'stu-2', date: '2026-09-16', status: 'hadir' },
+  { id: 'att-12', classId: 'cls-3', studentId: 'stu-2', date: '2026-09-23', status: 'hadir' },
+  { id: 'att-13', classId: 'cls-10', studentId: 'stu-1', date: '2026-09-18', status: 'hadir' },
+  { id: 'att-14', classId: 'cls-10', studentId: 'stu-2', date: '2026-09-18', status: 'hadir' },
+  { id: 'att-15', classId: 'cls-10', studentId: 'stu-4', date: '2026-09-18', status: 'izin' },
+  { id: 'att-16', classId: 'cls-10', studentId: 'stu-9', date: '2026-09-18', status: 'hadir' },
 ];
 
 export const grades = [
@@ -214,6 +225,8 @@ export const grades = [
   // Current semester draft grades
   { id: 'grd-4', studentId: 'stu-1', courseId: 'crs-5', semesterId: 'sem-1', tugas: 80, kuis: 75, uts: 0, uas: 0, finalScore: null, letterGrade: null, mutu: null, sks: 3, status: 'draft' },
   { id: 'grd-5', studentId: 'stu-2', courseId: 'crs-5', semesterId: 'sem-1', tugas: 85, kuis: 90, uts: 0, uas: 0, finalScore: null, letterGrade: null, mutu: null, sks: 3, status: 'draft' },
+  { id: 'grd-6', studentId: 'stu-1', courseId: 'crs-6', classId: 'cls-3', semesterId: 'sem-1', lecturerId: 'lec-1', tugas: 82, kuis: 80, praktikum: 85, uts: 0, uas: 0, finalScore: null, letterGrade: null, mutu: null, sks: 3, status: 'draft' },
+  { id: 'grd-7', studentId: 'stu-2', courseId: 'crs-6', classId: 'cls-3', semesterId: 'sem-1', lecturerId: 'lec-1', tugas: 88, kuis: 90, praktikum: 86, uts: 0, uas: 0, finalScore: null, letterGrade: null, mutu: null, sks: 3, status: 'draft' },
 ];
 
 export const theses = [
