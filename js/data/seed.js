@@ -18,6 +18,11 @@ import {
 
 const SEED_VERSION = 'v1.6';
 
+/** Koleksi wajib — jika kosong padahal versi cocok, seed dianggap rusak (sering di HP / kuota penuh). */
+const CRITICAL_COLLECTIONS = [
+  'lecturers', 'students', 'campuses', 'classes', 'courses', 'studyPrograms',
+];
+
 /** Penugasan dosen wali awal dari field student.advisor */
 function buildAdvisorAssignments() {
   return students
@@ -35,63 +40,77 @@ function buildAdvisorAssignments() {
     }));
 }
 
+function isSeedIntact() {
+  return CRITICAL_COLLECTIONS.every(key => {
+    const data = Storage.get(key);
+    return Array.isArray(data) && data.length > 0;
+  });
+}
+
 export function initSeed(force = false) {
   const currentVersion = Storage.get('seed-version');
-  if (currentVersion === SEED_VERSION && !force) return;
+  if (currentVersion === SEED_VERSION && !force && isSeedIntact()) return;
+
+  if (currentVersion === SEED_VERSION && !force && !isSeedIntact()) {
+    console.warn('[SIAKAD] Seed rusak/kosong — reseeding (perangkat mungkin kehabisan kuota localStorage).');
+  }
 
   // Clear existing demo data
   Storage.clearAll();
 
+  const writes = [];
+  const put = (key, value) => { writes.push([key, Storage.set(key, value)]); };
+
   // Seed all collections
-  Storage.set('foundation', foundation);
-  Storage.set('campuses', campuses);
-  Storage.set('faculties', faculties);
-  Storage.set('studyPrograms', studyPrograms);
-  Storage.set('academicYears', academicYears);
-  Storage.set('semesters', semesters);
-  Storage.set('academicCalendar', academicCalendar);
+  put('foundation', foundation);
+  put('campuses', campuses);
+  put('faculties', faculties);
+  put('studyPrograms', studyPrograms);
+  put('academicYears', academicYears);
+  put('semesters', semesters);
+  put('academicCalendar', academicCalendar);
 
-  Storage.set('students', students);
-  Storage.set('admissions', admissions);
-  Storage.set('scholarships', scholarships);
+  put('students', students);
+  put('admissions', admissions);
+  put('scholarships', scholarships);
 
-  Storage.set('lecturers', lecturers);
-  Storage.set('courses', courses);
-  Storage.set('curricula', curricula);
-  Storage.set('classes', classes);
-  Storage.set('enrollments', enrollments);
-  Storage.set('attendances', attendances);
-  Storage.set('grades', grades);
-  Storage.set('theses', theses);
-  Storage.set('notifications', notifications);
-  Storage.set('auditLogs', auditLogs);
-  Storage.set('krsPolicy', krsPolicy);
-  Storage.set('registrationPolicy', registrationPolicy);
-  Storage.set('semesterRegistrations', semesterRegistrations);
-  Storage.set('krsPlans', krsPlans);
-  Storage.set('advisorAssignments', buildAdvisorAssignments());
+  put('lecturers', lecturers);
+  put('courses', courses);
+  put('curricula', curricula);
+  put('classes', classes);
+  put('enrollments', enrollments);
+  put('attendances', attendances);
+  put('grades', grades);
+  put('theses', theses);
+  put('notifications', notifications);
+  put('auditLogs', auditLogs);
+  put('krsPolicy', krsPolicy);
+  put('registrationPolicy', registrationPolicy);
+  put('semesterRegistrations', semesterRegistrations);
+  put('krsPlans', krsPlans);
+  put('advisorAssignments', buildAdvisorAssignments());
 
   // Portal Dosen LEC-031–037
-  Storage.set('classAnnouncements', classAnnouncements);
-  Storage.set('advisingConsultations', advisingConsultations);
-  Storage.set('lecturerAdminRequests', lecturerAdminRequests);
-  Storage.set('classAssignments', classAssignments);
-  Storage.set('assignmentSubmissions', assignmentSubmissions);
+  put('classAnnouncements', classAnnouncements);
+  put('advisingConsultations', advisingConsultations);
+  put('lecturerAdminRequests', lecturerAdminRequests);
+  put('classAssignments', classAssignments);
+  put('assignmentSubmissions', assignmentSubmissions);
 
-  Storage.set('invoices', invoices);
-  Storage.set('payments', payments);
-  Storage.set('chartOfAccounts', chartOfAccounts);
-  Storage.set('journals', journals);
-  Storage.set('budgets', budgets);
-  Storage.set('employees', employees);
-  Storage.set('payrollRuns', payrollRuns);
-  Storage.set('assets', assets);
-  Storage.set('procurementRequests', procurementRequests);
-  Storage.set('pddiktiJobs', pddiktiJobs);
-  Storage.set('demoUsers', demoUsers);
+  put('invoices', invoices);
+  put('payments', payments);
+  put('chartOfAccounts', chartOfAccounts);
+  put('journals', journals);
+  put('budgets', budgets);
+  put('employees', employees);
+  put('payrollRuns', payrollRuns);
+  put('assets', assets);
+  put('procurementRequests', procurementRequests);
+  put('pddiktiJobs', pddiktiJobs);
+  put('demoUsers', demoUsers);
 
   // App settings
-  Storage.set('settings', {
+  put('settings', {
     foundationName: 'Yayasan Cakrawala Pendidikan',
     defaultAcademicYear: 'ay-3',
     defaultSemester: 'sem-1',
@@ -100,6 +119,18 @@ export function initSeed(force = false) {
     docNumberFormat: '{TYPE}/{YEAR}/{SEQ}',
     theme: 'light',
   });
+
+  const failed = writes.filter(([, ok]) => !ok).map(([k]) => k);
+  if (failed.length) {
+    console.error('[SIAKAD] Gagal menulis seed (kuota localStorage?):', failed.join(', '));
+    // Jangan set versi agar boot berikutnya mencoba seed ulang
+    return;
+  }
+
+  if (!isSeedIntact()) {
+    console.error('[SIAKAD] Seed tidak utuh setelah write — versi tidak disimpan.');
+    return;
+  }
 
   Storage.set('seed-version', SEED_VERSION);
   console.info('[SIAKAD] Demo data seeded successfully.');

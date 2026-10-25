@@ -1,0 +1,12 @@
+# SIAKAD Cakrawala — static prototype (no build step)
+[build]
+  publish = "."
+  command = "echo 'Static site — no build'"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[build.environment]
+  NODE_VERSION = "20"

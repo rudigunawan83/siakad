@@ -533,6 +533,8 @@ img, svg { max-width: 100%; }
   #sidebar {
     position: fixed;
     left: -100%;
+    width: min(86vw, 20rem);
+    min-width: min(86vw, 20rem);
     height: 100vh;
     transition: left var(--transition-normal);
     z-index: var(--z-offcanvas);
@@ -563,19 +565,80 @@ img, svg { max-width: 100%; }
 }
 
 @media (max-width: 767.98px) {
+  #topbar {
+    height: auto;
+    min-height: var(--topbar-height);
+    padding: 0.625rem 0.75rem;
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .topbar-left {
+    width: 100%;
+    justify-content: space-between;
+    flex: 1 0 100%;
+  }
+  .topbar-right {
+    width: 100%;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto auto;
+    gap: 0.5rem;
+  }
+  .topbar-right > * { min-width: 0; }
+  .topbar-select {
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+  }
+  .topbar-select--campus,
+  .topbar-select--year {
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+  }
+  .topbar-icon-btn,
+  .role-badge,
+  #user-menu-btn {
+    min-height: 44px;
+  }
+  #user-menu-btn {
+    justify-content: center;
+    padding-inline: 0.625rem;
+  }
+  .topbar-dropdown-panel {
+    position: fixed;
+    left: 0.75rem;
+    right: 0.75rem;
+    top: calc(var(--topbar-height) + 0.75rem);
+  }
   .page-header { flex-direction: column; gap: var(--space-3); }
   .page-actions { width: 100%; }
   .topbar-breadcrumb { display: none; }
   .topbar-select--campus {
-    min-width: 6.5rem;
-    width: 7.5rem;
-    max-width: 8.5rem;
+    min-width: 0;
+    width: 100%;
+    max-width: none;
   }
 }
 
 @media (max-width: 575.98px) {
+  .page-container { padding: 0.875rem; }
+  .topbar-right {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  }
+  #user-menu-btn {
+    width: 44px;
+    padding-inline: 0;
+  }
+  #user-menu-btn i:last-child { display: none; }
   .role-badge .role-badge-label { display: none; }
-  .role-badge { padding: var(--space-1) var(--space-2); }
+  .role-badge {
+    padding: var(--space-1) var(--space-2);
+    justify-content: center;
+  }
+  .topbar-dropdown-panel {
+    left: 0.5rem;
+    right: 0.5rem;
+  }
 }
 
 /* ========================================

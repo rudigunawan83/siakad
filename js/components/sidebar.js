@@ -418,4 +418,15 @@ export function renderSidebar() {
     const btn = sidebar.querySelector('#sidebar-toggle i');
     if (btn) btn.className = 'bi bi-chevron-right';
   }
+
+  const closeMobileSidebar = () => {
+    if (window.innerWidth > 991.98) return;
+    sidebar.classList.remove('mobile-open');
+    const overlay = document.getElementById('sidebar-overlay');
+    if (overlay) overlay.style.display = 'none';
+  };
+
+  sidebar.querySelectorAll('a[href^="#/"]').forEach(link => {
+    link.addEventListener('click', closeMobileSidebar);
+  });
 }

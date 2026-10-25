@@ -35,7 +35,29 @@ export function renderLecturerPortal(path, container) {
     return renderAdvisorKrsApproval(path, container);
 
   const lecturer = getLecturer();
-  if (!lecturer) { container.innerHTML = '<div class="page-container"><p>Data dosen tidak ditemukan.</p></div>'; return; }
+  if (!lecturer) {
+    const hasAny = DB.getAll('lecturers').length > 0;
+    container.innerHTML = `
+<div class="page-container">
+  <div class="empty-state" style="padding:2.5rem 1rem;text-align:center">
+    <div class="empty-state-title">${hasAny ? 'Profil dosen tidak cocok dengan peran aktif' : 'Data demo belum tersedia di perangkat ini'}</div>
+    <p class="text-muted" style="max-width:28rem;margin:0.75rem auto 1.25rem">
+      ${hasAny
+        ? 'Ganti peran di pojok kanan atas ke <strong>Dosen</strong>.'
+        : 'Prototype menyimpan data di localStorage browser HP (bukan server). Storage kosong/rusak sering terjadi di mode privat, browser dalam aplikasi (WhatsApp/Instagram), atau kuota penuh.'}
+    </p>
+    <button type="button" class="btn btn-primary" id="lec-reseed-btn">
+      <i class="bi bi-arrow-clockwise"></i> Muat ulang data demo
+    </button>
+  </div>
+</div>`;
+    container.querySelector('#lec-reseed-btn')?.addEventListener('click', async () => {
+      const { initSeed } = await import('../data/seed.js');
+      initSeed(true);
+      location.reload();
+    });
+    return;
+  }
 
   // determine active sub-page from path
   const sub = path.replace('/portal/lecturer', '').replace(/^\//, '') || 'dashboard';
