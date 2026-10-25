@@ -6,7 +6,7 @@ import { initSeed, DB } from './data/seed.js';
 import { AppState } from './state.js';
 import { Router } from './router.js';
 import { renderSidebar } from './components/sidebar.js';
-import { renderTopbar } from './components/topbar.js';
+import { renderTopbar } from './components/topbar.js?v=20261025p';
 import { showToast } from './components/toast.js';
 
 // Pages

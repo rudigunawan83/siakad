@@ -19,18 +19,18 @@
 
   <!-- Design System -->
   <link rel="stylesheet" href="css/tokens.css">
-  <link rel="stylesheet" href="css/layout.css?v=20261025h">
+  <link rel="stylesheet" href="css/layout.css?v=20261025p">
   <link rel="stylesheet" href="css/components.css">
-  <link rel="stylesheet" href="css/pages.css?v=20261025h">
+  <link rel="stylesheet" href="css/pages.css?v=20261025p">
 
   <style>
     /* Critical inline styles for initial load */
     body { margin: 0; font-family: 'Inter', 'Segoe UI', sans-serif; background: var(--color-bg); }
     #app-shell { display: flex; height: 100vh; overflow: hidden; }
-    #sidebar { width: var(--sidebar-width); min-width: var(--sidebar-width); background: var(--color-navy-900); overflow-y: auto; overflow-x: hidden; flex-shrink: 0; position: relative; transition: var(--transition-sidebar); display: flex; flex-direction: column; z-index: var(--z-sidebar); }
+    #sidebar { width: var(--sidebar-width); min-width: var(--sidebar-width); background: var(--color-navy-900); overflow-y: auto; overflow-x: hidden; flex-shrink: 0; position: relative; transition: transform var(--transition-normal), width var(--transition-normal), min-width var(--transition-normal); display: flex; flex-direction: column; z-index: var(--z-fixed); }
     #sidebar.collapsed { width: var(--sidebar-collapsed-width); min-width: var(--sidebar-collapsed-width); }
     #main-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
-    #topbar { min-height: var(--topbar-height); background: var(--color-surface); border-bottom: 1px solid var(--color-border); display: flex; align-items: center; padding: 0 1.5rem; gap: 0.75rem; flex-shrink: 0; z-index: var(--z-topbar); box-shadow: var(--shadow-sm); }
+    #topbar { min-height: var(--topbar-height); background: var(--color-surface); border-bottom: 1px solid var(--color-border); display: flex; align-items: center; padding: 0 1.5rem; gap: 0.75rem; flex-shrink: 0; z-index: var(--z-sticky); box-shadow: var(--shadow-sm); }
     #content { flex: 1; overflow-y: auto; overflow-x: hidden; background: var(--color-bg); }
     /* Splash */
     #splash { position: fixed; inset: 0; background: var(--color-navy-900); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; transition: opacity 0.5s ease; }
@@ -43,9 +43,9 @@
     @keyframes splashPulse { from { transform: scale(1); opacity: 0.8; } to { transform: scale(1.05); opacity: 1; } }
     @keyframes splashLoad { from { width: 0; } to { width: 100%; } }
     /* Mobile overlay */
-    #sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: calc(var(--z-sidebar) - 1); }
+    #sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: calc(var(--z-offcanvas) - 1); }
     @media (max-width: 991px) {
-      #sidebar { position: fixed; top: 0; left: 0; height: 100%; transform: translateX(-100%); }
+      #sidebar { position: fixed; top: 0; left: 0; height: 100%; transform: translateX(-100%); z-index: var(--z-offcanvas); }
       #sidebar.mobile-open { transform: translateX(0); }
       #main-area { width: 100%; }
     }
@@ -86,7 +86,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 
 <!-- App Entry Point -->
-<script type="module" src="js/app.js?v=20261025h"></script>
+<script type="module" src="js/app.js?v=20261025p"></script>
 
 <script>
   // Hide splash after app loads

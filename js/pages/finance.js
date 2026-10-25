@@ -11,6 +11,46 @@ import { createBarChart, createLineChart, createDoughnutChart, formatRupiahShort
 
 let _table;
 
+function buildAgingBuckets(invoices, referenceDate = today()) {
+  const parseDateOnly = (value) => {
+    if (!value) return null;
+    const d = new Date(`${value}T00:00:00`);
+    return Number.isNaN(d.getTime()) ? null : d;
+  };
+
+  const ref = parseDateOnly(referenceDate) || new Date();
+  const buckets = [
+    { label: '0–30 hari', amount: 0, count: 0, color: 'var(--color-success)' },
+    { label: '31–60 hari', amount: 0, count: 0, color: 'var(--color-warning)' },
+    { label: '61–90 hari', amount: 0, count: 0, color: 'var(--color-warning)' },
+    { label: '>90 hari', amount: 0, count: 0, color: 'var(--color-danger)' },
+  ];
+
+  invoices
+    .filter(i => (i.remaining || 0) > 0 && i.status !== 'dibatalkan')
+    .forEach((invoice) => {
+      const due = parseDateOnly(invoice.dueDate);
+      const daysPastDue = due ? Math.max(0, Math.floor((ref - due) / 86400000)) : 0;
+      const balance = invoice.remaining || 0;
+
+      let bucketIndex = 0;
+      if (daysPastDue > 90) bucketIndex = 3;
+      else if (daysPastDue > 60) bucketIndex = 2;
+      else if (daysPastDue > 30) bucketIndex = 1;
+
+      buckets[bucketIndex].amount += balance;
+      buckets[bucketIndex].count += 1;
+    });
+
+  const totalBalance = buckets.reduce((sum, bucket) => sum + bucket.amount, 0);
+  const totalCount = buckets.reduce((sum, bucket) => sum + bucket.count, 0);
+
+  return [
+    ...buckets,
+    { label: 'Total', amount: totalBalance, count: totalCount, color: 'var(--color-navy-800)' },
+  ];
+}
+
 export function renderFinance(path, container) {
   if (path.includes('/payments'))    return renderPayments(container);
   if (path.includes('/receivables')) return renderReceivables(container);
@@ -28,6 +68,7 @@ function renderFinanceDashboard(container) {
   const payments = DB.getAll('payments');
   const campusFilter = AppState.currentCampusFilter;
   const filtInv = campusFilter==='all' ? invoices : invoices.filter(i=>i.campusId===campusFilter);
+  const agingBuckets = buildAgingBuckets(filtInv);
 
   const totalBilled   = filtInv.reduce((s,i)=>s+i.amount,0);
   const totalPaid     = filtInv.reduce((s,i)=>s+i.paid,0);
@@ -84,13 +125,7 @@ function renderFinanceDashboard(container) {
     <div class="card-header"><h3 class="card-title">Analisis Piutang (Aging)</h3></div>
     <div class="card-body">
       <div class="aging-grid">
-        ${[
-          { label: '0–30 hari', amount: 2500000, count: 1, color: 'var(--color-success)' },
-          { label: '31–60 hari', amount: 0, count: 0, color: 'var(--color-warning)' },
-          { label: '61–90 hari', amount: 0, count: 0, color: 'var(--color-warning)' },
-          { label: '>90 hari', amount: 6500000+4800000, count: 2, color: 'var(--color-danger)' },
-          { label: 'Total', amount: totalOverdue+totalPartial, count: filtInv.filter(i=>i.remaining>0).length, color: 'var(--color-navy-800)' },
-        ].map(b=>`
+        ${agingBuckets.map(b=>`
           <div class="aging-bucket">
             <div class="aging-bucket-label">${b.label}</div>
             <div class="aging-bucket-value" style="color:${b.color}">${formatRupiah(b.amount)}</div>

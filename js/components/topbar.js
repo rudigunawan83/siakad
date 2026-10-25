@@ -29,6 +29,7 @@ export function renderTopbar() {
   const academicYears = DB.getAll('academicYears');
   const notifs = DB.getAll('notifications');
   const unread = notifs.filter(n => !n.read).length;
+  const isMobileTopbar = window.matchMedia('(max-width: 767.98px)').matches;
 
   // Desktop: nama lengkap. Tablet/mobile: kode saja agar tidak terpotong di tengah kata.
   const campusCompact = window.matchMedia('(max-width: 991.98px)').matches;
@@ -45,37 +46,22 @@ export function renderTopbar() {
   ).join('');
 
   const breadcrumb = buildBreadcrumb();
-
-  topbar.innerHTML = `
-    <div class="topbar-left">
-      <button class="topbar-icon-btn d-lg-none" id="mobile-menu-btn" title="Menu">
-        <i class="bi bi-list"></i>
-      </button>
-      <nav class="topbar-breadcrumb" aria-label="Breadcrumb">
-        ${breadcrumb}
-      </nav>
-    </div>
-    <div class="topbar-spacer"></div>
-    <div class="topbar-right">
-      <select class="topbar-select topbar-select--campus" id="campus-filter" title="Filter Kampus">
-        ${campusOptions}
-      </select>
-      <select class="topbar-select topbar-select--year" id="year-filter" title="Tahun Akademik">
-        ${yearOptions}
-      </select>
+  const roleSwitcherHTML = `
+      <div class="topbar-role-slot${isMobileTopbar ? ' topbar-role-slot-mobile' : ''}" style="position:relative">
+        <button class="btn role-badge" id="role-switcher-btn" title="Ganti Role Demo — ${role.label}">
+          <i class="bi bi-shuffle"></i> <span class="role-badge-label">${role.label}</span>
+        </button>
+        <div id="role-switcher-panel" class="topbar-dropdown-panel topbar-dropdown-panel--role" style="display:none"></div>
+      </div>`;
+  const notifHTML = `
       <div style="position:relative">
         <button class="topbar-icon-btn" id="notif-btn" title="Notifikasi">
           <i class="bi bi-bell"></i>
           <span class="topbar-badge" id="notif-badge" style="${unread === 0 ? 'display:none' : ''}">${unread > 9 ? '9+' : unread}</span>
         </button>
         <div id="notif-panel" class="topbar-dropdown-panel" style="display:none"></div>
-      </div>
-      <div style="position:relative">
-        <button class="btn role-badge" id="role-switcher-btn" title="Ganti Role Demo — ${role.label}">
-          <i class="bi bi-shuffle"></i> <span class="role-badge-label">${role.label}</span>
-        </button>
-        <div id="role-switcher-panel" class="topbar-dropdown-panel" style="display:none"></div>
-      </div>
+      </div>`;
+  const userMenuHTML = `
       <div style="position:relative">
         <button class="d-flex align-items-center gap-2 btn btn-secondary btn-sm" id="user-menu-btn" style="border-radius:var(--radius-full)">
           <div class="user-avatar">${role.avatar}</div>
@@ -99,7 +85,44 @@ export function renderTopbar() {
             <i class="bi bi-box-arrow-right"></i> Keluar Demo
           </button>
         </div>
-      </div>
+      </div>`;
+  const filterHTML = `
+      <select class="topbar-select topbar-select--campus" id="campus-filter" title="Filter Kampus">
+        ${campusOptions}
+      </select>
+      <select class="topbar-select topbar-select--year" id="year-filter" title="Tahun Akademik">
+        ${yearOptions}
+      </select>`;
+
+  topbar.innerHTML = isMobileTopbar ? `
+    <div class="topbar-left">
+      <button class="topbar-icon-btn d-lg-none" id="mobile-menu-btn" title="Menu">
+        <i class="bi bi-list"></i>
+      </button>
+      ${roleSwitcherHTML}
+    </div>
+    <div class="topbar-mobile-header-actions">
+      ${notifHTML}
+      ${userMenuHTML}
+    </div>
+    <div class="topbar-right topbar-right-mobile-selects">
+      ${filterHTML}
+    </div>
+  ` : `
+    <div class="topbar-left">
+      <button class="topbar-icon-btn d-lg-none" id="mobile-menu-btn" title="Menu">
+        <i class="bi bi-list"></i>
+      </button>
+      <nav class="topbar-breadcrumb" aria-label="Breadcrumb">
+        ${breadcrumb}
+      </nav>
+    </div>
+    <div class="topbar-spacer"></div>
+    <div class="topbar-right">
+      ${filterHTML}
+      ${notifHTML}
+      ${roleSwitcherHTML}
+      ${userMenuHTML}
     </div>
   `;
 
@@ -276,9 +299,10 @@ function toggleRoleSwitcher() {
   const panel = document.getElementById('role-switcher-panel');
   if (!panel) return;
   if (panel.style.display !== 'none') { panel.style.display = 'none'; return; }
+  const isMobile = window.matchMedia('(max-width: 767.98px)').matches;
 
   panel.innerHTML = `
-    <div class="role-switcher-dropdown" style="position:static">
+    <div class="role-switcher-dropdown" style="position:static;width:${isMobile ? '100%' : 'min(360px, calc(100vw - 1rem))'};max-width:100%;max-height:${isMobile ? 'min(80vh, 40rem)' : 'calc(100vh - 80px)'}">
       <div class="role-switcher-header">
         <div style="font-size:var(--text-xs);font-weight:var(--font-semibold);color:var(--color-muted)">GANTI ROLE DEMO</div>
       </div>
@@ -286,14 +310,30 @@ function toggleRoleSwitcher() {
         ${ROLES.map(r => `
           <div class="role-option ${r.id === AppState.currentRole.id ? 'active' : ''}" data-role="${r.id}">
             <div class="role-option-icon"><i class="bi ${r.icon}"></i></div>
-            <div>
-              <div class="role-option-name">${r.label}</div>
-              <div class="role-option-scope">${r.scopeLabel}</div>
+            <div class="role-option-content" style="flex:1;min-width:0">
+              <div class="role-option-name" style="${isMobile ? 'word-break:normal;overflow-wrap:break-word;line-height:1.45;' : ''}">${r.label}</div>
+              <div class="role-option-scope" style="${isMobile ? 'word-break:normal;overflow-wrap:break-word;line-height:1.45;' : ''}">${r.scopeLabel}</div>
             </div>
             ${r.id === AppState.currentRole.id ? '<i class="bi bi-check2 ms-auto text-gold"></i>' : ''}
           </div>`).join('')}
       </div>
     </div>`;
+
+  if (isMobile) {
+    panel.style.position = 'fixed';
+    panel.style.left = '0.75rem';
+    panel.style.right = '0.75rem';
+    panel.style.top = '5.25rem';
+    panel.style.width = 'auto';
+    panel.style.zIndex = '1070';
+  } else {
+    panel.style.position = '';
+    panel.style.left = '';
+    panel.style.right = '';
+    panel.style.top = '';
+    panel.style.width = '';
+    panel.style.zIndex = '';
+  }
 
   panel.style.display = 'block';
 

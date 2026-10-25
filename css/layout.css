@@ -25,7 +25,8 @@ button { cursor: pointer; }
 img, svg { max-width: 100%; }
 
 /* ---- App Shell ---- */
-#app {
+#app,
+#app-shell {
   display: flex;
   height: 100vh;
   overflow: hidden;
@@ -256,13 +257,16 @@ img, svg { max-width: 100%; }
 /* ========================================
    MAIN AREA (Topbar + Content)
    ======================================== */
-#main {
+#main,
+#main-area {
   flex: 1;
   display: flex;
   flex-direction: column;
   min-width: 0;
   height: 100vh;
   overflow: hidden;
+  position: relative;
+  z-index: 1;
 }
 
 /* ========================================
@@ -316,6 +320,10 @@ img, svg { max-width: 100%; }
 }
 
 .topbar-spacer { flex: 1; }
+
+.topbar-mobile-header-actions {
+  display: none;
+}
 
 .topbar-right {
   display: flex;
@@ -439,6 +447,8 @@ img, svg { max-width: 100%; }
   background: var(--color-bg);
   scrollbar-width: thin;
   scrollbar-color: var(--color-border) transparent;
+  position: relative;
+  z-index: 0;
 }
 
 #content::-webkit-scrollbar { width: 6px; }
@@ -532,27 +542,54 @@ img, svg { max-width: 100%; }
 @media (max-width: 991.98px) {
   #sidebar {
     position: fixed;
-    left: -100%;
+    top: 0;
+    left: 0;
     width: min(86vw, 20rem);
     min-width: min(86vw, 20rem);
+    max-width: min(86vw, 20rem);
     height: 100vh;
-    transition: left var(--transition-normal);
+    transform: translateX(-100%);
+    transition: transform var(--transition-normal);
     z-index: var(--z-offcanvas);
+    box-shadow: var(--shadow-xl);
+  }
+
+  #sidebar.collapsed {
+    width: min(86vw, 20rem);
+    min-width: min(86vw, 20rem);
+    max-width: min(86vw, 20rem);
+  }
+
+  #sidebar.collapsed .sidebar-brand-text,
+  #sidebar.collapsed .nav-group-label,
+  #sidebar.collapsed .nav-link .nav-label,
+  #sidebar.collapsed .sidebar-footer-text {
+    opacity: 1;
+    width: auto;
+  }
+
+  #sidebar.collapsed .nav-link .nav-badge {
+    display: inline-flex;
+  }
+
+  #sidebar.collapsed .nav-expand {
+    display: inline-block;
   }
 
   #sidebar.mobile-open {
-    left: 0;
+    transform: translateX(0);
   }
 
-  .sidebar-overlay {
-    display: block !important;
+  .sidebar-overlay,
+  #sidebar-overlay {
     position: fixed;
     inset: 0;
     background: rgba(0,0,0,0.5);
     z-index: calc(var(--z-offcanvas) - 1);
   }
 
-  #main { width: 100%; }
+  #main,
+  #main-area { width: 100%; }
   #topbar { padding: 0 var(--space-4); gap: var(--space-2); }
   .page-container { padding: var(--space-4); }
   /* Tablet: label kampus dipersingkat lewat JS (kode saja) */
@@ -573,15 +610,43 @@ img, svg { max-width: 100%; }
     flex-wrap: wrap;
   }
   .topbar-left {
-    width: 100%;
-    justify-content: space-between;
-    flex: 1 0 100%;
+    width: auto;
+    justify-content: flex-start;
+    flex: 0 0 auto;
+    gap: 0.5rem;
+  }
+  .topbar-spacer {
+    display: none;
+  }
+  .topbar-mobile-header-actions {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+  }
+  .topbar-role-slot-mobile {
+    flex-shrink: 0;
+  }
+  .topbar-role-slot-mobile .role-badge {
+    min-width: 44px;
+    min-height: 44px;
+    padding-inline: 0;
+    justify-content: center;
+  }
+  .topbar-role-slot-mobile .role-badge .role-badge-label {
+    display: none;
   }
   .topbar-right {
     width: 100%;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto auto;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
     gap: 0.5rem;
+    flex: 1 0 100%;
+    margin-top: 0.5rem;
+  }
+  .topbar-right.topbar-right-mobile-selects {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
   .topbar-right > * { min-width: 0; }
   .topbar-select {
@@ -599,6 +664,11 @@ img, svg { max-width: 100%; }
   .role-badge,
   #user-menu-btn {
     min-height: 44px;
+  }
+  .topbar-dropdown-panel--role {
+    left: 0.5rem;
+    right: 0.5rem;
+    top: calc(var(--topbar-height) + 0.5rem);
   }
   #user-menu-btn {
     justify-content: center;
@@ -661,7 +731,8 @@ img, svg { max-width: 100%; }
 /* ========================================
    OVERLAY (hidden by default)
    ======================================== */
-.sidebar-overlay { display: none; }
+.sidebar-overlay,
+#sidebar-overlay { display: none; }
 
 /* ========================================
    PRINT STYLES
@@ -669,7 +740,8 @@ img, svg { max-width: 100%; }
 @media print {
   #sidebar, #topbar, .page-actions, .filter-bar,
   .btn-action, .topbar-icon-btn, .demo-banner { display: none !important; }
-  #main { margin: 0; padding: 0; }
+  #main,
+  #main-area { margin: 0; padding: 0; }
   #content { overflow: visible; }
   .page-container { padding: 0; max-width: none; }
 }
