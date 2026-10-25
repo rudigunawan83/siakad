@@ -3,13 +3,9 @@
  */
 
 import { DB } from '../data/seed.js';
-import { AppState } from '../state.js';
-import { formatDate, statusBadge, exportCSV, generateId } from '../utils.js';
+import { formatDate, statusBadge } from '../utils.js';
 import { DataTable } from '../components/data-table.js';
-import { openFormModal } from '../components/modal.js';
-import { showToast, showConfirm } from '../components/toast.js';
-import { createBarChart } from '../components/charts.js';
-import { renderComingSoon } from '../ui-helpers.js';
+import { showToast } from '../components/toast.js';
 import { renderStaffRegistration } from './registration.js';
 import { renderStaffKrsApproval } from './krs-approval.js';
 import { renderAdvisors } from './advisors.js';
@@ -196,17 +192,26 @@ export function renderAcademic(path, container) {
   if (path.includes('/courses'))      return renderCourses(container);
   if (path.includes('/classes'))      return renderClasses(container);
   if (path.includes('/curriculum'))   return renderCurriculum(container);
-  if (path.includes('/prerequisites') || path.includes('/schedule') || path.includes('/evaluation')) {
-    const labels = {
-      '/prerequisites': 'Prasyarat Mata Kuliah',
-      '/schedule': 'Penjadwalan',
-      '/evaluation': 'Evaluasi Akademik',
-    };
-    const key = Object.keys(labels).find(k => path.includes(k));
-    container.innerHTML = renderComingSoon(labels[key] || 'Akademik', 'Akademik', path);
-    return;
-  }
+  if (path.includes('/prerequisites')) return renderCoursePrerequisites(container);
+  if (path.includes('/schedule')) return renderAcademicSchedule(container);
+  if (path.includes('/evaluation')) return renderAcademicEvaluation(container);
   renderCourses(container);
+}
+
+function renderAcademicEmptyState(title, description, detail) {
+  return `
+<div class="page-container">
+  <div class="page-header"><div class="page-header-info"><h1 class="page-title">${title}</h1><p class="page-desc">${description}</p></div></div>
+  <div class="card" style="max-width:760px">
+    <div class="card-body" style="padding:2rem;text-align:center">
+      <div style="width:64px;height:64px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:var(--color-gold-50);color:var(--color-gold-600);font-size:1.5rem;margin-bottom:1rem">
+        <i class="bi bi-journal-text"></i>
+      </div>
+      <div style="font-weight:var(--font-semibold);margin-bottom:.5rem">Belum ada data aktif</div>
+      <div style="font-size:var(--text-sm);color:var(--color-muted)">${detail}</div>
+    </div>
+  </div>
+</div>`;
 }
 
 function renderCourses(container) {
@@ -298,12 +303,117 @@ function buildCurriculumView(prodi, allCourses) {
       </div>`).join('')}`;
 }
 
+function renderCoursePrerequisites(container) {
+  const courses = DB.getAll('courses');
+  const lookup = new Map(courses.map(item => [item.id, item]));
+  const rows = courses
+    .filter(item => item.prerequisite)
+    .map(item => ({
+      code: item.code,
+      name: item.name,
+      prerequisite: lookup.get(item.prerequisite)
+        ? `${lookup.get(item.prerequisite).code} - ${lookup.get(item.prerequisite).name}`
+        : item.prerequisite,
+      semester: item.semester,
+    }));
+  if (!rows.length) {
+    container.innerHTML = renderAcademicEmptyState('Prasyarat Mata Kuliah', 'Daftar aturan prasyarat antar mata kuliah.', 'Belum ada mata kuliah dengan prasyarat pada data demo.');
+    return;
+  }
+  container.innerHTML = `
+<div class="page-container">
+  <div class="page-header"><div class="page-header-info"><h1 class="page-title">Prasyarat Mata Kuliah</h1><p class="page-desc">Hubungan prasyarat antar mata kuliah pada kurikulum aktif</p></div></div>
+  <div class="card">
+    <div class="scroll-x">
+      <table class="data-table">
+        <thead><tr><th>Kode</th><th>Mata Kuliah</th><th>Prasyarat</th><th>Semester</th></tr></thead>
+        <tbody>${rows.map(row => `
+          <tr>
+            <td><code>${row.code}</code></td>
+            <td>${row.name}</td>
+            <td>${row.prerequisite}</td>
+            <td>${row.semester}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>`;
+}
+
+function renderAcademicSchedule(container) {
+  const classes = DB.getAll('classes');
+  const courses = DB.getAll('courses');
+  const lecturers = DB.getAll('lecturers');
+  const rows = classes.map(item => ({
+    code: item.code,
+    course: courses.find(course => course.id === item.courseId)?.name || '-',
+    lecturer: lecturers.find(lecturer => lecturer.id === item.lecturerId)?.name || '-',
+    day: item.day,
+    time: `${item.startTime} - ${item.endTime}`,
+    room: item.room,
+  }));
+  container.innerHTML = `
+<div class="page-container">
+  <div class="page-header"><div class="page-header-info"><h1 class="page-title">Penjadwalan</h1><p class="page-desc">Jadwal kelas aktif perkuliahan semester berjalan</p></div></div>
+  <div id="academic-schedule-table"></div>
+</div>`;
+  new DataTable({
+    containerId:'academic-schedule-table',
+    columns:[
+      {key:'code',label:'Kelas',render:r=>`<strong>${r.code}</strong>`},
+      {key:'course',label:'Mata Kuliah'},
+      {key:'lecturer',label:'Dosen'},
+      {key:'day',label:'Hari'},
+      {key:'time',label:'Jam'},
+      {key:'room',label:'Ruang'},
+    ],
+    data:rows,
+    searchFields:['code','course','lecturer','room'],
+  });
+}
+
+function renderAcademicEvaluation(container) {
+  const students = DB.getAll('students');
+  const campuses = DB.getAll('campuses');
+  const rows = campuses.map(campus => {
+    const members = students.filter(item => item.campusId === campus.id);
+    const avgIpk = members.reduce((sum, item) => sum + (item.ipk || 0), 0) / (members.length || 1);
+    const atRisk = members.filter(item => (item.ipk || 0) < 2.75 || item.status !== 'aktif').length;
+    return {
+      campus: campus.code,
+      students: members.length,
+      avgIpk,
+      atRisk,
+      note: atRisk > 0 ? 'Perlu monitoring' : 'Stabil',
+    };
+  });
+  container.innerHTML = `
+<div class="page-container">
+  <div class="page-header"><div class="page-header-info"><h1 class="page-title">Evaluasi Akademik</h1><p class="page-desc">Ringkasan performa akademik mahasiswa per kampus</p></div></div>
+  <div id="academic-evaluation-table"></div>
+</div>`;
+  new DataTable({
+    containerId:'academic-evaluation-table',
+    columns:[
+      {key:'campus',label:'Kampus'},
+      {key:'students',label:'Mahasiswa'},
+      {key:'avgIpk',label:'Rata-rata IPK',render:r=>r.avgIpk.toFixed(2)},
+      {key:'atRisk',label:'Perlu Perhatian'},
+      {key:'note',label:'Catatan'},
+    ],
+    data:rows,
+    searchFields:['campus','note'],
+  });
+}
+
 // ===================== LECTURERS =====================
 export function renderLecturers(path, container) {
-  // Sub-route dispatch
-  const lecSubs = { '/staff':'Tenaga Kependidikan', '/assignments':'Penugasan Mengajar', '/workload':'Beban Kerja Dosen', '/certification':'Sertifikasi', '/evaluation':'Evaluasi Kinerja' };
-  const lsub = Object.keys(lecSubs).find(r => path.includes(r));
-  if (lsub) { container.innerHTML = renderComingSoon(lecSubs[lsub], 'Dosen & SDM Akademik', path); return; }
+  if (path.includes('/staff')) return renderAcademicStaff(container);
+  if (path.includes('/assignments')) return renderLecturerAssignments(container);
+  if (path.includes('/workload')) return renderLecturerWorkload(container);
+  if (path.includes('/certification')) return renderLecturerCertification(container);
+  if (path.includes('/evaluation')) return renderLecturerEvaluation(container);
 
   const lecturers = DB.getAll('lecturers');
   const campuses  = DB.getAll('campuses');
@@ -329,15 +439,161 @@ export function renderLecturers(path, container) {
   });
 }
 
+function renderAcademicStaff(container) {
+  const employees = DB.getAll('employees').filter(item => /akademik|baak|registrar/i.test(`${item.unit} ${item.position}`));
+  container.innerHTML = `
+<div class="page-container">
+  <div class="page-header"><div class="page-header-info"><h1 class="page-title">Tenaga Kependidikan</h1><p class="page-desc">Staf operasional akademik dan administrasi kampus</p></div></div>
+  <div id="academic-staff-table"></div>
+</div>`;
+  new DataTable({
+    containerId:'academic-staff-table',
+    columns:[
+      {key:'empId',label:'ID',render:r=>`<code>${r.empId}</code>`},
+      {key:'name',label:'Nama'},
+      {key:'unit',label:'Unit'},
+      {key:'position',label:'Jabatan'},
+      {key:'status',label:'Status',render:r=>statusBadge(r.status)},
+    ],
+    data:employees,
+    searchFields:['name','unit','position'],
+  });
+}
+
+function renderLecturerAssignments(container) {
+  const lecturers = DB.getAll('lecturers');
+  const classes = DB.getAll('classes');
+  const courses = DB.getAll('courses');
+  const rows = lecturers.map(lecturer => {
+    const teaching = classes.filter(item => item.lecturerId === lecturer.id);
+    return {
+      name: lecturer.name,
+      nidn: lecturer.nidn,
+      assignmentCount: teaching.length,
+      assignments: teaching.map(item => {
+        const course = courses.find(courseItem => courseItem.id === item.courseId);
+        return `${item.code} - ${course?.name || '-'}`;
+      }).join('<br>') || '<span style="color:var(--color-muted)">Belum ada penugasan</span>',
+    };
+  });
+  container.innerHTML = `
+<div class="page-container">
+  <div class="page-header"><div class="page-header-info"><h1 class="page-title">Penugasan Mengajar</h1><p class="page-desc">Distribusi kelas aktif per dosen</p></div></div>
+  <div id="lecturer-assign-table"></div>
+</div>`;
+  new DataTable({
+    containerId:'lecturer-assign-table',
+    columns:[
+      {key:'nidn',label:'NIDN',render:r=>`<code>${r.nidn}</code>`},
+      {key:'name',label:'Dosen'},
+      {key:'assignmentCount',label:'Jumlah Kelas'},
+      {key:'assignments',label:'Mata Kuliah',sortable:false,render:r=>r.assignments},
+    ],
+    data:rows,
+    searchFields:['name','nidn'],
+  });
+}
+
+function renderLecturerWorkload(container) {
+  const lecturers = DB.getAll('lecturers');
+  const classes = DB.getAll('classes');
+  const rows = lecturers.map(lecturer => {
+    const teaching = classes.filter(item => item.lecturerId === lecturer.id);
+    const totalStudents = teaching.reduce((sum, item) => sum + (item.enrolled || 0), 0);
+    return {
+      name: lecturer.name,
+      position: lecturer.position,
+      classes: teaching.length,
+      students: totalStudents,
+      load: teaching.length >= 4 ? 'tinggi' : teaching.length >= 2 ? 'normal' : 'rendah',
+    };
+  });
+  container.innerHTML = `
+<div class="page-container">
+  <div class="page-header"><div class="page-header-info"><h1 class="page-title">Beban Kerja Dosen</h1><p class="page-desc">Monitoring jumlah kelas dan mahasiswa yang ditangani</p></div></div>
+  <div id="lecturer-workload-table"></div>
+</div>`;
+  new DataTable({
+    containerId:'lecturer-workload-table',
+    columns:[
+      {key:'name',label:'Dosen'},
+      {key:'position',label:'Jabatan'},
+      {key:'classes',label:'Kelas Aktif'},
+      {key:'students',label:'Total Mahasiswa'},
+      {key:'load',label:'Status Beban',render:r=>statusBadge(r.load)},
+    ],
+    data:rows,
+    searchFields:['name','position'],
+  });
+}
+
+function renderLecturerCertification(container) {
+  const lecturers = DB.getAll('lecturers');
+  const rows = lecturers.map((lecturer, index) => ({
+    name: lecturer.name,
+    nidn: lecturer.nidn,
+    level: lecturer.position,
+    certification: index % 3 === 0 ? 'Serdos aktif' : index % 3 === 1 ? 'Perpanjangan 2027' : 'Belum diajukan',
+    dueDate: index % 3 === 2 ? '-' : index % 3 === 0 ? '2027-12-31' : '2027-06-30',
+  }));
+  container.innerHTML = `
+<div class="page-container">
+  <div class="page-header"><div class="page-header-info"><h1 class="page-title">Sertifikasi Dosen</h1><p class="page-desc">Status sertifikasi dan kebutuhan tindak lanjut</p></div></div>
+  <div id="lecturer-cert-table"></div>
+</div>`;
+  new DataTable({
+    containerId:'lecturer-cert-table',
+    columns:[
+      {key:'nidn',label:'NIDN',render:r=>`<code>${r.nidn}</code>`},
+      {key:'name',label:'Dosen'},
+      {key:'level',label:'Jabatan'},
+      {key:'certification',label:'Status Sertifikasi'},
+      {key:'dueDate',label:'Masa Berlaku',render:r=>r.dueDate === '-' ? '-' : formatDate(r.dueDate)},
+    ],
+    data:rows,
+    searchFields:['name','nidn','certification'],
+  });
+}
+
+function renderLecturerEvaluation(container) {
+  const lecturers = DB.getAll('lecturers');
+  const rows = lecturers.map((lecturer, index) => ({
+    name: lecturer.name,
+    nidn: lecturer.nidn,
+    score: 84 + (index % 5) * 3,
+    studentFeedback: ['Sangat baik', 'Baik', 'Baik', 'Perlu coaching ringan', 'Sangat baik'][index % 5],
+    followUp: index % 4 === 0 ? 'Observasi kelas semester depan' : 'Tidak ada',
+  }));
+  container.innerHTML = `
+<div class="page-container">
+  <div class="page-header"><div class="page-header-info"><h1 class="page-title">Evaluasi Kinerja Dosen</h1><p class="page-desc">Ringkasan skor evaluasi per dosen untuk semester berjalan</p></div></div>
+  <div id="lecturer-eval-table"></div>
+</div>`;
+  new DataTable({
+    containerId:'lecturer-eval-table',
+    columns:[
+      {key:'name',label:'Dosen'},
+      {key:'nidn',label:'NIDN',render:r=>`<code>${r.nidn}</code>`},
+      {key:'score',label:'Skor'},
+      {key:'studentFeedback',label:'Feedback Mahasiswa'},
+      {key:'followUp',label:'Tindak Lanjut'},
+    ],
+    data:rows,
+    searchFields:['name','nidn','studentFeedback'],
+  });
+}
+
 // ===================== LEARNING =====================
 export function renderLearning(path, container) {
   if (path.includes('/registration')) return renderStaffRegistration(path, container);
   if (path.includes('/krs-approval')) return renderStaffKrsApproval(path, container);
   if (path.includes('/krs'))          return renderKRS(container);
   if (path.includes('/attendance'))   return renderAttendance(container);
+  if (path.includes('/assignments'))  return renderLearningAssignments(container);
   if (path.includes('/grades'))       return renderGrades(container);
   if (path.includes('/transcript'))   return renderTranscript(container);
   if (path.includes('/khs'))          return renderKHS(container);
+  if (path.includes('/evaluation'))   return renderLearningEvaluation(container);
   renderKRS(container);
 }
 
@@ -519,8 +775,79 @@ function renderKHS(container) {
 </div>`;
 }
 
+function renderLearningAssignments(container) {
+  const classes = DB.getAll('classes');
+  const courses = DB.getAll('courses');
+  const upcoming = classes.slice(0, 4).map((item, index) => ({
+    classCode: item.code,
+    course: courses.find(course => course.id === item.courseId)?.name || '-',
+    type: index % 2 === 0 ? 'Tugas' : 'Ujian',
+    dueDate: ['2026-10-28', '2026-11-02', '2026-11-05', '2026-11-12'][index],
+    status: index === 2 ? 'draft' : 'terjadwal',
+  }));
+  if (!upcoming.length) {
+    container.innerHTML = renderAcademicEmptyState('Tugas & Ujian', 'Jadwal tugas, kuis, dan ujian per kelas.', 'Belum ada agenda tugas atau ujian pada data demo.');
+    return;
+  }
+  container.innerHTML = `
+<div class="page-container">
+  <div class="page-header"><div class="page-header-info"><h1 class="page-title">Tugas & Ujian</h1><p class="page-desc">Agenda penugasan dan evaluasi kelas yang akan berjalan</p></div></div>
+  <div class="card">
+    <div class="scroll-x">
+      <table class="data-table">
+        <thead><tr><th>Kelas</th><th>Mata Kuliah</th><th>Tipe</th><th>Jadwal</th><th>Status</th></tr></thead>
+        <tbody>${upcoming.map(item => `
+          <tr>
+            <td><strong>${item.classCode}</strong></td>
+            <td>${item.course}</td>
+            <td>${statusBadge(item.type.toLowerCase())}</td>
+            <td>${formatDate(item.dueDate)}</td>
+            <td>${statusBadge(item.status)}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>`;
+}
+
+function renderLearningEvaluation(container) {
+  const lecturers = DB.getAll('lecturers');
+  const rows = lecturers.slice(0, 6).map((lecturer, index) => ({
+    lecturer: lecturer.name,
+    courseLoad: lecturer.classCount,
+    responseRate: 68 + index * 4,
+    score: (4.1 + (index % 3) * 0.2).toFixed(1),
+    status: index === 4 ? 'perlu tindak lanjut' : 'normal',
+  }));
+  container.innerHTML = `
+<div class="page-container">
+  <div class="page-header"><div class="page-header-info"><h1 class="page-title">Evaluasi Dosen</h1><p class="page-desc">Ringkasan evaluasi pembelajaran berdasarkan respon mahasiswa</p></div></div>
+  <div id="learning-evaluation-table"></div>
+</div>`;
+  new DataTable({
+    containerId:'learning-evaluation-table',
+    columns:[
+      {key:'lecturer',label:'Dosen'},
+      {key:'courseLoad',label:'Kelas Aktif'},
+      {key:'responseRate',label:'Response Rate',render:r=>`${r.responseRate}%`},
+      {key:'score',label:'Skor Rata-rata'},
+      {key:'status',label:'Status',render:r=>statusBadge(r.status)},
+    ],
+    data:rows,
+    searchFields:['lecturer','status'],
+  });
+}
+
 // ===================== THESIS =====================
 export function renderThesis(path, container) {
+  if (path.includes('/topics')) return renderThesisTopics(container);
+  if (path.includes('/supervision')) return renderThesisSupervision(container);
+  if (path.includes('/defense')) return renderThesisDefense(container);
+  return renderThesisOverview(container);
+}
+
+function renderThesisOverview(container) {
   const theses    = DB.getAll('theses');
   const students  = DB.getAll('students');
   const lecturers = DB.getAll('lecturers');
@@ -554,4 +881,104 @@ export function renderThesis(path, container) {
       </div>
     </div>`;}).join('')}
 </div>`;
+}
+
+function renderThesisTopics(container) {
+  const theses = DB.getAll('theses');
+  const students = DB.getAll('students');
+  const prodi = DB.getAll('studyPrograms');
+  const rows = theses
+    .filter(item => ['Pengajuan Topik', 'Proposal'].includes(item.stage) || item.status === 'menunggu review')
+    .map(item => ({
+      student: students.find(student => student.id === item.studentId)?.name || '-',
+      nim: students.find(student => student.id === item.studentId)?.nim || '-',
+      prodi: prodi.find(program => program.id === item.prodiId)?.name || '-',
+      title: item.title,
+      submittedAt: item.topicDate,
+      status: item.status,
+    }));
+  container.innerHTML = `
+<div class="page-container">
+  <div class="page-header"><div class="page-header-info"><h1 class="page-title">Pengajuan Topik</h1><p class="page-desc">Daftar topik yang baru diajukan atau masih dalam tahap proposal</p></div></div>
+  <div id="thesis-topic-table"></div>
+</div>`;
+  new DataTable({
+    containerId:'thesis-topic-table',
+    columns:[
+      {key:'nim',label:'NIM',render:r=>`<code>${r.nim}</code>`},
+      {key:'student',label:'Mahasiswa'},
+      {key:'prodi',label:'Prodi'},
+      {key:'title',label:'Topik'},
+      {key:'submittedAt',label:'Tgl. Pengajuan',render:r=>formatDate(r.submittedAt)},
+      {key:'status',label:'Status',render:r=>statusBadge(r.status)},
+    ],
+    data:rows,
+    searchFields:['student','nim','prodi','title'],
+  });
+}
+
+function renderThesisSupervision(container) {
+  const theses = DB.getAll('theses');
+  const students = DB.getAll('students');
+  const lecturers = DB.getAll('lecturers');
+  const rows = theses
+    .filter(item => ['Bimbingan', 'Seminar'].includes(item.stage))
+    .map(item => ({
+      student: students.find(student => student.id === item.studentId)?.name || '-',
+      supervisor: lecturers.find(lecturer => lecturer.id === item.supervisorId)?.name || '-',
+      stage: item.stage,
+      updatedAt: item.updatedAt,
+      note: item.notes,
+    }));
+  container.innerHTML = `
+<div class="page-container">
+  <div class="page-header"><div class="page-header-info"><h1 class="page-title">Bimbingan Tugas Akhir</h1><p class="page-desc">Progress mahasiswa yang sedang aktif dibimbing</p></div></div>
+  <div id="thesis-supervision-table"></div>
+</div>`;
+  new DataTable({
+    containerId:'thesis-supervision-table',
+    columns:[
+      {key:'student',label:'Mahasiswa'},
+      {key:'supervisor',label:'Pembimbing'},
+      {key:'stage',label:'Tahap',render:r=>statusBadge(r.stage)},
+      {key:'updatedAt',label:'Update Terakhir',render:r=>formatDate(r.updatedAt)},
+      {key:'note',label:'Catatan',sortable:false},
+    ],
+    data:rows,
+    searchFields:['student','supervisor','note'],
+  });
+}
+
+function renderThesisDefense(container) {
+  const theses = DB.getAll('theses');
+  const students = DB.getAll('students');
+  const lecturers = DB.getAll('lecturers');
+  const rows = theses
+    .filter(item => ['Seminar', 'Sidang', 'Selesai'].includes(item.stage))
+    .map(item => ({
+      student: students.find(student => student.id === item.studentId)?.name || '-',
+      supervisor: lecturers.find(lecturer => lecturer.id === item.supervisorId)?.name || '-',
+      stage: item.stage,
+      seminarDate: item.seminarDate,
+      defenseDate: item.defenseDate,
+      status: item.status,
+    }));
+  container.innerHTML = `
+<div class="page-container">
+  <div class="page-header"><div class="page-header-info"><h1 class="page-title">Seminar & Sidang</h1><p class="page-desc">Jadwal dan status tahapan seminar hasil maupun sidang akhir</p></div></div>
+  <div id="thesis-defense-table"></div>
+</div>`;
+  new DataTable({
+    containerId:'thesis-defense-table',
+    columns:[
+      {key:'student',label:'Mahasiswa'},
+      {key:'supervisor',label:'Pembimbing'},
+      {key:'stage',label:'Tahap',render:r=>statusBadge(r.stage)},
+      {key:'seminarDate',label:'Seminar',render:r=>r.seminarDate ? formatDate(r.seminarDate) : '-'},
+      {key:'defenseDate',label:'Sidang',render:r=>r.defenseDate ? formatDate(r.defenseDate) : '-'},
+      {key:'status',label:'Status',render:r=>statusBadge(r.status)},
+    ],
+    data:rows,
+    searchFields:['student','supervisor','stage'],
+  });
 }

@@ -300,6 +300,51 @@
   border: 1px solid var(--color-navy-100);
 }
 
+@media (max-width: 767.98px) {
+  .demo-banner,
+  .approval-item,
+  .activity-item,
+  .invoice-detail-row,
+  .curriculum-course-row,
+  .krs-sks-counter {
+    flex-wrap: wrap;
+  }
+
+  .curriculum-course-row {
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .curriculum-course-row > * {
+    min-width: 0;
+  }
+
+  .page-container [style*="display:grid;grid-template-columns:1fr 1fr"],
+  .page-container [style*="display:grid;grid-template-columns:1.2fr .8fr"],
+  .page-container [style*="display:grid;grid-template-columns:repeat(2,minmax(0,1fr))"],
+  .page-container [style*="display:grid;grid-template-columns:repeat(3,1fr)"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  .demo-banner {
+    padding: 0.875rem 1rem;
+    font-size: 0.78rem;
+    border-radius: 1rem;
+  }
+
+  .activity-item,
+  .approval-item {
+    gap: 0.625rem;
+    padding: 0.75rem 0;
+  }
+}
+
+@media (max-width: 575.98px) {
+  .page-container [style*="display:grid;grid-template-columns:repeat(2,minmax(0,1fr))"] {
+    grid-template-columns: 1fr !important;
+  }
+}
+
 /* Attendance Grid */
 .attendance-row {
   display: flex;

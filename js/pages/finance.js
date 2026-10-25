@@ -11,13 +11,69 @@ import { createBarChart, createLineChart, createDoughnutChart, formatRupiahShort
 
 let _table;
 
-function buildAgingBuckets(invoices, referenceDate = today()) {
-  const parseDateOnly = (value) => {
-    if (!value) return null;
-    const d = new Date(`${value}T00:00:00`);
-    return Number.isNaN(d.getTime()) ? null : d;
-  };
+function parseDateOnly(value) {
+  if (!value) return null;
+  const d = new Date(`${value}T00:00:00`);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
 
+function isPastDue(invoice, referenceDate = today()) {
+  if (!invoice || (invoice.remaining || 0) <= 0 || invoice.status === 'dibatalkan') return false;
+  const due = parseDateOnly(invoice.dueDate);
+  const ref = parseDateOnly(referenceDate) || new Date();
+  return !!due && due < ref;
+}
+
+function getFilteredInvoices() {
+  const invoices = DB.getAll('invoices');
+  const campusFilter = AppState.currentCampusFilter;
+  return campusFilter === 'all' ? invoices : invoices.filter(i => i.campusId === campusFilter);
+}
+
+function getFilteredPayments() {
+  const payments = DB.getAll('payments');
+  const invoiceMap = new Map(DB.getAll('invoices').map(i => [i.id, i]));
+  const campusFilter = AppState.currentCampusFilter;
+  if (campusFilter === 'all') return payments;
+  return payments.filter(p => p.campusId === campusFilter || invoiceMap.get(p.invoiceId)?.campusId === campusFilter);
+}
+
+function getFilteredJournals() {
+  const journals = DB.getAll('journals');
+  const campusFilter = AppState.currentCampusFilter;
+  return campusFilter === 'all' ? journals : journals.filter(j => j.campusId === campusFilter);
+}
+
+function getSemesterMonths() {
+  return [
+    { key: '2026-07', label: 'Jul' },
+    { key: '2026-08', label: 'Agu' },
+    { key: '2026-09', label: 'Sep' },
+    { key: '2026-10', label: 'Okt' },
+    { key: '2026-11', label: 'Nov' },
+    { key: '2026-12', label: 'Des' },
+  ];
+}
+
+function buildMonthlyTotals(rows, dateField, amountField, months = getSemesterMonths()) {
+  const byMonth = Object.fromEntries(months.map(m => [m.key, 0]));
+  rows.forEach((row) => {
+    const key = String(row?.[dateField] || '').slice(0, 7);
+    if (byMonth[key] !== undefined) byMonth[key] += Number(row?.[amountField] || 0);
+  });
+  return months.map(m => byMonth[m.key]);
+}
+
+function getExpenseJournalRows(journals) {
+  const expenseAccountIds = new Set(
+    DB.getAll('chartOfAccounts')
+      .filter(account => account.type === 'Beban')
+      .map(account => account.id)
+  );
+  return journals.filter(journal => expenseAccountIds.has(journal.debit));
+}
+
+function buildAgingBuckets(invoices, referenceDate = today()) {
   const ref = parseDateOnly(referenceDate) || new Date();
   const buckets = [
     { label: '0–30 hari', amount: 0, count: 0, color: 'var(--color-success)' },
@@ -52,10 +108,15 @@ function buildAgingBuckets(invoices, referenceDate = today()) {
 }
 
 export function renderFinance(path, container) {
+  if (path.includes('/fee-components')) return renderFeeComponents(container);
   if (path.includes('/payments'))    return renderPayments(container);
   if (path.includes('/receivables')) return renderReceivables(container);
+  if (path.includes('/installments')) return renderInstallments(container);
+  if (path.includes('/discounts'))   return renderDiscounts(container);
   if (path.includes('/journals'))    return renderJournals(container);
+  if (path.includes('/ledger'))      return renderLedger(container);
   if (path.includes('/coa'))         return renderCOA(container);
+  if (path.includes('/consolidation')) return renderConsolidation(container);
   if (path.includes('/reports'))     return renderFinanceReports(container);
   if (path.includes('/invoices'))    return renderInvoices(container);
   // Default: dashboard
@@ -64,17 +125,17 @@ export function renderFinance(path, container) {
 
 // ---- Finance Dashboard ----
 function renderFinanceDashboard(container) {
-  const invoices = DB.getAll('invoices');
-  const payments = DB.getAll('payments');
-  const campusFilter = AppState.currentCampusFilter;
-  const filtInv = campusFilter==='all' ? invoices : invoices.filter(i=>i.campusId===campusFilter);
+  const filtInv = getFilteredInvoices();
+  const filtPayments = getFilteredPayments();
   const agingBuckets = buildAgingBuckets(filtInv);
 
   const totalBilled   = filtInv.reduce((s,i)=>s+i.amount,0);
   const totalPaid     = filtInv.reduce((s,i)=>s+i.paid,0);
-  const totalOverdue  = filtInv.filter(i=>i.status==='jatuh tempo').reduce((s,i)=>s+i.remaining,0);
+  const totalOverdue  = filtInv.filter(i=>isPastDue(i)).reduce((s,i)=>s+i.remaining,0);
   const totalPartial  = filtInv.filter(i=>i.status==='dibayar sebagian').reduce((s,i)=>s+i.remaining,0);
   const collectRate   = totalBilled>0 ? Math.round(totalPaid/totalBilled*100) : 0;
+  const months = getSemesterMonths();
+  const monthlyReceipts = buildMonthlyTotals(filtPayments, 'date', 'amount', months);
 
   container.innerHTML = `
 <div class="page-container">
@@ -146,8 +207,8 @@ function renderFinanceDashboard(container) {
 
   requestAnimationFrame(() => {
     createLineChart('rev-monthly', {
-      labels:['Jul','Agu','Sep','Okt','Nov','Des'],
-      datasets:[{ label:'Penerimaan', data:[280,620,540,310,0,0].map(v=>v*100000), color:'#213550' }],
+      labels: months.map(month => month.label),
+      datasets:[{ label:'Penerimaan', data: monthlyReceipts, color:'#213550' }],
       height:240, fill:true, formatY: formatRupiahShort,
     });
     const statusGroups = {};
@@ -185,8 +246,7 @@ function renderInvoices(container) {
   <div id="inv-table"></div>
 </div>`;
 
-  const invoices = DB.getAll('invoices');
-  const students = DB.getAll('students');
+  const invoices = getFilteredInvoices();
 
   _table = new DataTable({
     containerId: 'inv-table',
@@ -222,7 +282,7 @@ function renderInvoices(container) {
   document.getElementById('status-f')?.addEventListener('change', e=>_table?.filter('status',e.target.value));
   document.getElementById('type-f')?.addEventListener('change',   e=>_table?.filter('type',e.target.value));
   document.getElementById('clear-f')?.addEventListener('click',   ()=>{ [search,document.getElementById('status-f'),document.getElementById('type-f')].forEach(el=>{if(el)el.value=el.tagName==='SELECT'?el.options[0].value:'';}); _table?.clearFilters(); });
-  document.getElementById('exp-csv')?.addEventListener('click', () => exportCSV(DB.getAll('invoices'),'tagihan',[{key:'number',label:'No Tagihan'},{key:'studentName',label:'Nama'},{key:'type',label:'Jenis'},{key:'amount',label:'Tagihan'},{key:'paid',label:'Terbayar'},{key:'remaining',label:'Sisa'},{key:'status',label:'Status'}]));
+  document.getElementById('exp-csv')?.addEventListener('click', () => exportCSV(invoices,'tagihan',[{key:'number',label:'No Tagihan'},{key:'studentName',label:'Nama'},{key:'type',label:'Jenis'},{key:'amount',label:'Tagihan'},{key:'paid',label:'Terbayar'},{key:'remaining',label:'Sisa'},{key:'status',label:'Status'}]));
 }
 
 function handlePayment(invoice) {
@@ -266,12 +326,13 @@ function handlePayment(invoice) {
       const method = document.getElementById('pay-method').value;
       const note   = document.getElementById('pay-note').value;
       if (!amount || amount<=0) { showToast('Jumlah bayar harus lebih dari 0.','warning'); return; }
+      if (amount > invoice.remaining) { showToast('Jumlah bayar tidak boleh melebihi sisa tagihan.','warning'); return; }
       const newPaid = invoice.paid + amount;
       const newRemaining = Math.max(0, invoice.remaining - amount);
       const newStatus = newRemaining===0 ? 'lunas' : 'dibayar sebagian';
       DB.update('invoices', invoice.id, { paid: newPaid, remaining: newRemaining, status: newStatus });
       const txNum = `TRX-${Date.now()}`;
-      DB.add('payments', { id: generateId('pay'), txNum, date: today(), studentName: invoice.studentName, invoiceId: invoice.id, method, amount, status: 'berhasil', officer: `${AppState.currentRole.user} (demo)`, note: `[SIMULASI] ${note}` });
+      DB.add('payments', { id: generateId('pay'), txNum, date: today(), studentId: invoice.studentId, studentName: invoice.studentName, campusId: invoice.campusId, invoiceId: invoice.id, method, amount, status: 'berhasil', officer: `${AppState.currentRole.user} (demo)`, note: `[SIMULASI] ${note}` });
       DB.log('Catat Pembayaran Demo', 'Keuangan', `Tagihan: ${invoice.number}`);
       import('../components/modal.js').then(m=>m.closeModal());
       showToast(`Pembayaran ${formatRupiah(amount)} untuk ${invoice.studentName} berhasil dicatat (simulasi).`, 'success');
@@ -282,7 +343,7 @@ function handlePayment(invoice) {
 
 // ---- Payments ----
 function renderPayments(container) {
-  const payments = DB.getAll('payments');
+  const payments = getFilteredPayments();
   container.innerHTML = `
 <div class="page-container">
   <div class="page-header">
@@ -313,7 +374,7 @@ function renderPayments(container) {
 
 // ---- Receivables ----
 function renderReceivables(container) {
-  const invoices = DB.getAll('invoices').filter(i=>i.remaining>0);
+  const invoices = getFilteredInvoices().filter(i=>i.remaining>0 && i.status !== 'dibatalkan');
   const total = invoices.reduce((s,i)=>s+i.remaining,0);
   container.innerHTML = `
 <div class="page-container">
@@ -344,7 +405,7 @@ function renderReceivables(container) {
 
 // ---- Journals ----
 function renderJournals(container) {
-  const journals = DB.getAll('journals');
+  const journals = getFilteredJournals();
   const coa = DB.getAll('chartOfAccounts');
   const getAccName = id => coa.find(c=>c.id===id)?.name||id;
   container.innerHTML=`
@@ -399,11 +460,200 @@ function renderCOA(container) {
 </div>`;
 }
 
+function renderFeeComponents(container) {
+  const grouped = Object.values(getFilteredInvoices().reduce((acc, invoice) => {
+    const key = invoice.type || 'Lainnya';
+    if (!acc[key]) acc[key] = { type: key, invoiceCount: 0, billed: 0, paid: 0, remaining: 0 };
+    acc[key].invoiceCount += 1;
+    acc[key].billed += invoice.amount || 0;
+    acc[key].paid += invoice.paid || 0;
+    acc[key].remaining += invoice.remaining || 0;
+    return acc;
+  }, {}));
+
+  container.innerHTML = `
+<div class="page-container">
+  <div class="page-header">
+    <div class="page-header-info"><h1 class="page-title">Komponen Biaya</h1><p class="page-desc">Ringkasan jenis tagihan yang aktif di modul keuangan</p></div>
+  </div>
+  <div class="card">
+    <div class="scroll-x">
+      <table class="data-table">
+        <thead><tr><th>Komponen</th><th>Jumlah Tagihan</th><th>Nilai Tagihan</th><th>Terbayar</th><th>Balance</th></tr></thead>
+        <tbody>${grouped.map(row => `
+          <tr>
+            <td><strong>${row.type}</strong></td>
+            <td>${row.invoiceCount}</td>
+            <td>${formatRupiah(row.billed)}</td>
+            <td style="color:var(--color-success)">${formatRupiah(row.paid)}</td>
+            <td style="color:${row.remaining > 0 ? 'var(--color-danger)' : 'var(--color-success)'}">${formatRupiah(row.remaining)}</td>
+          </tr>`).join('') || '<tr><td colspan="5">Belum ada komponen biaya.</td></tr>'}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>`;
+}
+
+function renderInstallments(container) {
+  const invoices = getFilteredInvoices().filter(i => i.status === 'dibayar sebagian' && (i.remaining || 0) > 0);
+  const totalRemaining = invoices.reduce((sum, invoice) => sum + (invoice.remaining || 0), 0);
+  container.innerHTML = `
+<div class="page-container">
+  <div class="page-header">
+    <div class="page-header-info"><h1 class="page-title">Cicilan</h1><p class="page-desc">Monitoring tagihan yang sedang dibayar sebagian. Total balance: <strong style="color:var(--color-warning)">${formatRupiah(totalRemaining)}</strong></p></div>
+  </div>
+  <div id="installment-table"></div>
+</div>`;
+
+  new DataTable({
+    containerId: 'installment-table',
+    columns: [
+      { key:'number', label:'No. Tagihan', render:r=>`<strong>${r.number}</strong>` },
+      { key:'studentName', label:'Mahasiswa', render:r=>`<div>${r.studentName}</div><div style="font-size:10px;color:var(--color-muted)">${r.nim}</div>` },
+      { key:'type', label:'Jenis' },
+      { key:'amount', label:'Total', render:r=>formatRupiah(r.amount) },
+      { key:'paid', label:'Terbayar', render:r=>`<span style="color:var(--color-success)">${formatRupiah(r.paid)}</span>` },
+      { key:'remaining', label:'Sisa Cicilan', render:r=>`<strong style="color:var(--color-warning)">${formatRupiah(r.remaining)}</strong>` },
+      { key:'dueDate', label:'Jatuh Tempo', render:r=>formatDate(r.dueDate) },
+    ],
+    data: invoices,
+    searchFields: ['number', 'studentName', 'nim'],
+    defaultSort: 'remaining',
+  });
+}
+
+function renderDiscounts(container) {
+  const students = DB.getAll('students');
+  const campusFilter = AppState.currentCampusFilter;
+  const scholarships = DB.getAll('scholarships').filter((item) => {
+    const student = students.find(s => s.id === item.studentId);
+    return campusFilter === 'all' || student?.campusId === campusFilter;
+  }).map((item) => {
+    const student = students.find(s => s.id === item.studentId);
+    return { ...item, studentName: student?.name || '-', nim: student?.nim || '-', campusId: student?.campusId || null };
+  });
+  const totalScholarship = scholarships.reduce((sum, item) => sum + (item.amount || 0), 0);
+
+  container.innerHTML = `
+<div class="page-container">
+  <div class="page-header">
+    <div class="page-header-info"><h1 class="page-title">Beasiswa & Potongan</h1><p class="page-desc">Total nilai keringanan aktif: <strong style="color:var(--color-success)">${formatRupiah(totalScholarship)}</strong></p></div>
+  </div>
+  <div id="discount-table"></div>
+</div>`;
+
+  new DataTable({
+    containerId: 'discount-table',
+    columns: [
+      { key:'name', label:'Program', render:r=>`<strong>${r.name}</strong>` },
+      { key:'studentName', label:'Mahasiswa', render:r=>`<div>${r.studentName}</div><div style="font-size:10px;color:var(--color-muted)">${r.nim}</div>` },
+      { key:'type', label:'Jenis' },
+      { key:'period', label:'Periode' },
+      { key:'amount', label:'Nominal', render:r=>`<span style="color:var(--color-success)">${formatRupiah(r.amount)}</span>` },
+      { key:'status', label:'Status', render:r=>statusBadge(r.status) },
+    ],
+    data: scholarships,
+    searchFields: ['name', 'studentName', 'nim', 'period'],
+    defaultSort: 'amount',
+  });
+}
+
+function renderLedger(container) {
+  const journals = getFilteredJournals();
+  const coa = DB.getAll('chartOfAccounts');
+  const rows = coa.map((account) => {
+    const debit = journals.filter(j => j.debit === account.id).reduce((sum, row) => sum + (row.amount || 0), 0);
+    const credit = journals.filter(j => j.credit === account.id).reduce((sum, row) => sum + (row.amount || 0), 0);
+    const normalDebit = ['Aset', 'Beban'].includes(account.type);
+    const balance = normalDebit ? debit - credit : credit - debit;
+    return { ...account, debit, credit, balance };
+  }).filter(row => row.debit > 0 || row.credit > 0);
+
+  container.innerHTML = `
+<div class="page-container">
+  <div class="page-header">
+    <div class="page-header-info"><h1 class="page-title">Buku Besar</h1><p class="page-desc">Ringkasan saldo akun berdasarkan jurnal yang tercatat</p></div>
+    <div class="page-actions"><a href="#/finance/journals" class="btn btn-secondary">Jurnal Umum</a><a href="#/finance/coa" class="btn btn-secondary">Bagan Akun</a></div>
+  </div>
+  <div class="card">
+    <div class="scroll-x">
+      <table class="data-table">
+        <thead><tr><th>Kode</th><th>Akun</th><th>Tipe</th><th>Total Debit</th><th>Total Kredit</th><th>Balance</th></tr></thead>
+        <tbody>${rows.map(row => `
+          <tr>
+            <td><code>${row.code}</code></td>
+            <td>${row.name}</td>
+            <td>${row.type}</td>
+            <td style="color:var(--color-success)">${formatRupiah(row.debit)}</td>
+            <td style="color:var(--color-danger)">${formatRupiah(row.credit)}</td>
+            <td><strong style="color:${row.balance < 0 ? 'var(--color-danger)' : 'var(--color-navy-900)'}">${formatRupiah(Math.abs(row.balance))}</strong></td>
+          </tr>`).join('') || '<tr><td colspan="6">Belum ada mutasi jurnal.</td></tr>'}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>`;
+}
+
+function renderConsolidation(container) {
+  const campuses = DB.getAll('campuses');
+  const invoices = getFilteredInvoices();
+  const rows = (AppState.currentCampusFilter === 'all' ? campuses : campuses.filter(c => c.id === AppState.currentCampusFilter)).map((campus) => {
+    const items = invoices.filter(invoice => invoice.campusId === campus.id);
+    return {
+      campus: campus.name,
+      billed: items.reduce((sum, invoice) => sum + (invoice.amount || 0), 0),
+      paid: items.reduce((sum, invoice) => sum + (invoice.paid || 0), 0),
+      remaining: items.reduce((sum, invoice) => sum + (invoice.remaining || 0), 0),
+      invoiceCount: items.length,
+    };
+  });
+
+  container.innerHTML = `
+<div class="page-container">
+  <div class="page-header">
+    <div class="page-header-info"><h1 class="page-title">Konsolidasi Yayasan</h1><p class="page-desc">Ringkasan keuangan lintas kampus berdasarkan tagihan dan pembayaran</p></div>
+  </div>
+  <div class="card">
+    <div class="scroll-x">
+      <table class="data-table">
+        <thead><tr><th>Kampus</th><th>Jumlah Tagihan</th><th>Total Tagihan</th><th>Total Terbayar</th><th>Balance</th></tr></thead>
+        <tbody>${rows.map(row => `
+          <tr>
+            <td><strong>${row.campus}</strong></td>
+            <td>${row.invoiceCount}</td>
+            <td>${formatRupiah(row.billed)}</td>
+            <td style="color:var(--color-success)">${formatRupiah(row.paid)}</td>
+            <td style="color:${row.remaining > 0 ? 'var(--color-danger)' : 'var(--color-success)'}">${formatRupiah(row.remaining)}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>`;
+}
+
 // ---- Finance Reports ----
 function renderFinanceReports(container) {
-  const invoices = DB.getAll('invoices');
+  const invoices = getFilteredInvoices();
+  const payments = getFilteredPayments();
+  const journals = getFilteredJournals();
   const campuses = DB.getAll('campuses');
-  const totalRev = invoices.filter(i=>i.status==='lunas').reduce((s,i)=>s+i.paid,0);
+  const filteredCampuses = AppState.currentCampusFilter === 'all'
+    ? campuses
+    : campuses.filter(c => c.id === AppState.currentCampusFilter);
+  const totalRev = invoices.reduce((s,i)=>s+(i.paid||0),0);
+  const paidUKT = invoices.filter(i => i.type === 'UKT').reduce((s, i) => s + (i.paid || 0), 0);
+  const paidRegistration = invoices.filter(i => i.type === 'Biaya Pendaftaran').reduce((s, i) => s + (i.paid || 0), 0);
+  const otherIncome = invoices
+    .filter(i => !['UKT', 'Biaya Pendaftaran'].includes(i.type))
+    .reduce((s, i) => s + (i.paid || 0), 0);
+  const expenseRows = getExpenseJournalRows(journals);
+  const totalExpense = expenseRows.reduce((s, row) => s + (row.amount || 0), 0);
+  const months = getSemesterMonths();
+  const monthlyRevenue = buildMonthlyTotals(payments, 'date', 'amount', months);
+  const monthlyExpense = buildMonthlyTotals(expenseRows, 'date', 'amount', months);
   container.innerHTML=`
 <div class="page-container">
   <div class="page-header">
@@ -425,12 +675,10 @@ function renderFinanceReports(container) {
     <div class="card-header"><h3 class="card-title">Laporan Laba Rugi — Simulasi Q3 2026</h3></div>
     <div class="card-body">
       ${[
-        { label: 'Pendapatan UKT', amount: totalRev, type: 'income' },
-        { label: 'Pendapatan Biaya Pendaftaran', amount: 4200000, type: 'income' },
-        { label: 'Pendapatan Lain-lain', amount: 12500000, type: 'income' },
-        { label: 'Beban Gaji & Tunjangan', amount: -1640000000, type: 'expense' },
-        { label: 'Beban Operasional', amount: -280000000, type: 'expense' },
-        { label: 'Beban Penyusutan', amount: -42000000, type: 'expense' },
+        { label: 'Pendapatan UKT', amount: paidUKT, type: 'income' },
+        { label: 'Pendapatan Biaya Pendaftaran', amount: paidRegistration, type: 'income' },
+        { label: 'Pendapatan Lain-lain', amount: otherIncome, type: 'income' },
+        { label: 'Total Beban Tercatat', amount: -totalExpense, type: 'expense' },
       ].map(r=>`
         <div class="stat-row">
           <span class="stat-row-label" style="color:${r.type==='expense'?'var(--color-danger)':'inherit'}">${r.label}</span>
@@ -438,13 +686,30 @@ function renderFinanceReports(container) {
         </div>`).join('')}
       <div class="stat-row" style="border-top:2px solid var(--color-navy-900);margin-top:0.5rem;padding-top:0.5rem">
         <span class="stat-row-label" style="font-weight:700;color:var(--color-navy-900)">Surplus / (Defisit)</span>
-        <span class="stat-row-value" style="font-weight:700;font-size:1rem;color:var(--color-navy-900)">${formatRupiah(totalRev+4200000+12500000-1640000000-280000000-42000000)}</span>
+        <span class="stat-row-value" style="font-weight:700;font-size:1rem;color:var(--color-navy-900)">${formatRupiah(totalRev-totalExpense)}</span>
       </div>
     </div>
   </div>
 </div>`;
   requestAnimationFrame(()=>{
-    createBarChart('rpt-campus',{labels:campuses.map(c=>c.code),datasets:[{label:'Penerimaan',data:campuses.map(c=>invoices.filter(i=>i.campusId===c.id&&i.status==='lunas').reduce((s,i)=>s+i.paid,0)),color:'#213550'}],height:220,formatY:formatRupiahShort});
-    createBarChart('rpt-pnl',{labels:['Jul','Agu','Sep','Okt'],datasets:[{label:'Pendapatan',data:[580,620,820,310].map(v=>v*100000),color:'#198754'},{label:'Beban',data:[520,560,620,480].map(v=>v*100000),color:'#dc3545'}],height:220,formatY:formatRupiahShort});
+    createBarChart('rpt-campus',{
+      labels: filteredCampuses.map(c=>c.code),
+      datasets:[{
+        label:'Penerimaan',
+        data: filteredCampuses.map(c=>invoices.filter(i=>i.campusId===c.id).reduce((s,i)=>s+(i.paid||0),0)),
+        color:'#213550'
+      }],
+      height:220,
+      formatY:formatRupiahShort
+    });
+    createBarChart('rpt-pnl',{
+      labels: months.slice(0, 4).map(month => month.label),
+      datasets:[
+        {label:'Pendapatan',data:monthlyRevenue.slice(0, 4),color:'#198754'},
+        {label:'Beban',data:monthlyExpense.slice(0, 4),color:'#dc3545'}
+      ],
+      height:220,
+      formatY:formatRupiahShort
+    });
   });
 }

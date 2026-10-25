@@ -95,15 +95,17 @@ export function renderTopbar() {
       </select>`;
 
   topbar.innerHTML = isMobileTopbar ? `
-    <div class="topbar-left">
-      <button class="topbar-icon-btn d-lg-none" id="mobile-menu-btn" title="Menu">
-        <i class="bi bi-list"></i>
-      </button>
-      ${roleSwitcherHTML}
-    </div>
-    <div class="topbar-mobile-header-actions">
-      ${notifHTML}
-      ${userMenuHTML}
+    <div class="topbar-mobile-row">
+      <div class="topbar-left">
+        <button class="topbar-icon-btn d-lg-none" id="mobile-menu-btn" title="Menu">
+          <i class="bi bi-list"></i>
+        </button>
+        ${roleSwitcherHTML}
+      </div>
+      <div class="topbar-mobile-header-actions">
+        ${notifHTML}
+        ${userMenuHTML}
+      </div>
     </div>
     <div class="topbar-right topbar-right-mobile-selects">
       ${filterHTML}

@@ -14,10 +14,12 @@ let _table;
 
 export function renderAdmissions(path, container) {
   if (path.includes('/dashboard')) return renderPmbDashboard(container);
+  if (path.includes('/periods')) return renderPeriods(container);
   if (path.includes('/verification')) return renderVerification(container);
   if (path.includes('/selection')) return renderSelection(container);
   if (path.includes('/re-registration')) return renderReRegistration(container);
   if (path.includes('/convert')) return renderConvert(container);
+  if (path.includes('/reports')) return renderPmbReports(container);
   renderApplicants(path, container);
 }
 
@@ -254,6 +256,97 @@ function buildPmbKPIs(admissions) {
       <div class="kpi-value">${d.value}</div>
       <div class="kpi-label">${d.label}</div>
     </div>`).join('');
+}
+
+function renderPeriods(container) {
+  const admissions = DB.getAll('admissions');
+  const pathSummary = Object.entries(admissions.reduce((acc, item) => {
+    acc[item.path] = (acc[item.path] || 0) + 1;
+    return acc;
+  }, {}));
+  const activePeriod = {
+    name: 'PMB Ganjil 2026/2027',
+    wave: 'Gelombang 2',
+    registration: '1 Juli 2026 - 31 Agustus 2026',
+    selection: '5 September 2026 - 12 September 2026',
+    announcement: '15 September 2026',
+    reRegistration: '16 September 2026 - 30 September 2026',
+  };
+
+  container.innerHTML = `
+<div class="page-container">
+  <div class="page-header">
+    <div class="page-header-info"><h1 class="page-title">Periode & Jalur PMB</h1><p class="page-desc">Konfigurasi periode aktif dan distribusi jalur pendaftaran</p></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1.2fr .8fr;gap:1.5rem">
+    <div class="card">
+      <div class="card-header"><h3 class="card-title">Periode Aktif</h3></div>
+      <div class="card-body">
+        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem">
+          <div><div style="font-size:var(--text-xs);color:var(--color-muted)">Nama Periode</div><strong>${activePeriod.name}</strong></div>
+          <div><div style="font-size:var(--text-xs);color:var(--color-muted)">Gelombang</div><strong>${activePeriod.wave}</strong></div>
+          <div><div style="font-size:var(--text-xs);color:var(--color-muted)">Pendaftaran</div><strong>${activePeriod.registration}</strong></div>
+          <div><div style="font-size:var(--text-xs);color:var(--color-muted)">Seleksi</div><strong>${activePeriod.selection}</strong></div>
+          <div><div style="font-size:var(--text-xs);color:var(--color-muted)">Pengumuman</div><strong>${activePeriod.announcement}</strong></div>
+          <div><div style="font-size:var(--text-xs);color:var(--color-muted)">Daftar Ulang</div><strong>${activePeriod.reRegistration}</strong></div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><h3 class="card-title">Jalur Pendaftaran</h3></div>
+      <div class="card-body">
+        ${pathSummary.map(([label, count]) => `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:.75rem 0;border-bottom:1px solid var(--color-border)">
+            <div><strong>${label}</strong></div>
+            <span class="badge badge-navy">${count} pendaftar</span>
+          </div>`).join('')}
+      </div>
+    </div>
+  </div>
+</div>`;
+}
+
+function renderPmbReports(container) {
+  const admissions = DB.getAll('admissions');
+  const campuses = DB.getAll('campuses');
+  const converted = admissions.filter(item => item.status === 'menjadi mahasiswa').length;
+  const reRegistered = admissions.filter(item => item.status === 'daftar ulang').length;
+  const passed = admissions.filter(item => item.selectionStatus === 'lulus seleksi').length;
+  const rows = campuses.map(campus => {
+    const items = admissions.filter(item => item.campusId === campus.id);
+    return {
+      campus: campus.code,
+      applicants: items.length,
+      verified: items.filter(item => item.docStatus === 'terverifikasi').length,
+      passed: items.filter(item => item.selectionStatus === 'lulus seleksi').length,
+      converted: items.filter(item => item.status === 'menjadi mahasiswa').length,
+    };
+  });
+
+  container.innerHTML = `
+<div class="page-container">
+  <div class="page-header"><div class="page-header-info"><h1 class="page-title">Laporan PMB</h1><p class="page-desc">Ringkasan funnel pendaftaran mahasiswa baru</p></div></div>
+  <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:1.5rem">
+    <div class="kpi-card kpi-card-navy"><div class="kpi-value">${admissions.length}</div><div class="kpi-label">Total Pendaftar</div></div>
+    <div class="kpi-card kpi-card-info"><div class="kpi-value">${passed}</div><div class="kpi-label">Lulus Seleksi</div></div>
+    <div class="kpi-card kpi-card-warning"><div class="kpi-value">${reRegistered}</div><div class="kpi-label">Daftar Ulang</div></div>
+    <div class="kpi-card kpi-card-success"><div class="kpi-value">${converted}</div><div class="kpi-label">Menjadi Mahasiswa</div></div>
+  </div>
+  <div id="pmb-report-table"></div>
+</div>`;
+
+  new DataTable({
+    containerId:'pmb-report-table',
+    columns:[
+      {key:'campus',label:'Kampus'},
+      {key:'applicants',label:'Pendaftar'},
+      {key:'verified',label:'Terverifikasi'},
+      {key:'passed',label:'Lulus Seleksi'},
+      {key:'converted',label:'Konversi Mahasiswa'},
+    ],
+    data:rows,
+    searchFields:['campus'],
+  });
 }
 
 function buildAdmTable(campuses) {

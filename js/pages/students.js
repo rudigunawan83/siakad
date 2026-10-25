@@ -3,12 +3,10 @@
  */
 
 import { DB } from '../data/seed.js';
-import { AppState } from '../state.js';
-import { formatDate, statusBadge, exportCSV, generateId, today } from '../utils.js';
+import { formatDate, statusBadge, exportCSV, generateId } from '../utils.js';
 import { DataTable } from '../components/data-table.js';
 import { openFormModal } from '../components/modal.js';
 import { showToast, showConfirm } from '../components/toast.js';
-import { renderComingSoon } from '../ui-helpers.js';
 import { renderStaffRegistration } from './registration.js';
 
 let _table;
@@ -19,18 +17,13 @@ export function renderStudents(path, container) {
     return renderStaffRegistration(path, container);
   }
 
-  // Sub-route dispatch
-  const subRoutes = ['/academic-status','/leave','/scholarships','/letters','/graduation','/commencement','/alumni'];
-  const sub = subRoutes.find(r => path.includes(r));
-  if (sub) {
-    const labels = {
-      '/academic-status':'Status Akademik','/leave':'Cuti & Aktif Kembali',
-      '/scholarships':'Beasiswa & Keringanan','/letters':'Surat Akademik','/graduation':'Yudisium',
-      '/commencement':'Wisuda','/alumni':'Alumni',
-    };
-    container.innerHTML = renderComingSoon(labels[sub] || 'Mahasiswa', 'Mahasiswa', path);
-    return;
-  }
+  if (path.includes('/academic-status')) return renderStudentAcademicStatus(container);
+  if (path.includes('/leave')) return renderStudentLeave(container);
+  if (path.includes('/scholarships')) return renderStudentScholarships(container);
+  if (path.includes('/letters')) return renderStudentLetters(container);
+  if (path.includes('/graduation')) return renderStudentGraduation(container);
+  if (path.includes('/commencement')) return renderStudentCommencement(container);
+  if (path.includes('/alumni')) return renderStudentAlumni(container);
 
   const campuses     = DB.getAll('campuses');
   const faculties    = DB.getAll('faculties');
@@ -77,6 +70,184 @@ export function renderStudents(path, container) {
 
   buildTable(studyPrograms, campuses, faculties);
   bindEvents(studyPrograms, campuses);
+}
+
+function renderStudentsEmptyState(title, description, detail = 'Belum ada data untuk ditampilkan pada modul ini.') {
+  return `
+<div class="page-container">
+  <div class="page-header"><div class="page-header-info"><h1 class="page-title">${title}</h1><p class="page-desc">${description}</p></div></div>
+  <div class="card" style="max-width:760px">
+    <div class="card-body" style="padding:2rem;text-align:center">
+      <div style="width:64px;height:64px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:var(--color-navy-50);color:var(--color-navy-700);font-size:1.5rem;margin-bottom:1rem">
+        <i class="bi bi-inbox"></i>
+      </div>
+      <div style="font-weight:var(--font-semibold);margin-bottom:.5rem">Belum ada data aktif</div>
+      <div style="font-size:var(--text-sm);color:var(--color-muted)">${detail}</div>
+    </div>
+  </div>
+</div>`;
+}
+
+function renderStudentAcademicStatus(container) {
+  const students = DB.getAll('students');
+  const studyPrograms = DB.getAll('studyPrograms');
+  container.innerHTML = `
+<div class="page-container">
+  <div class="page-header"><div class="page-header-info"><h1 class="page-title">Status Akademik</h1><p class="page-desc">Monitoring status studi, semester, dan indikator akademik mahasiswa</p></div></div>
+  <div id="student-academic-status-table"></div>
+</div>`;
+  new DataTable({
+    containerId:'student-academic-status-table',
+    columns:[
+      {key:'nim',label:'NIM',render:r=>`<code>${r.nim}</code>`},
+      {key:'name',label:'Mahasiswa'},
+      {key:'prodiId',label:'Prodi',render:r=>studyPrograms.find(item=>item.id===r.prodiId)?.code||'-'},
+      {key:'semester',label:'Semester'},
+      {key:'ipk',label:'IPK',render:r=>`<strong>${r.ipk?.toFixed(2)||'-'}</strong>`},
+      {key:'status',label:'Status Akademik',render:r=>statusBadge(r.status)},
+      {key:'paymentStatus',label:'Status Tagihan',render:r=>statusBadge(r.paymentStatus)},
+    ],
+    data:students,
+    searchFields:['nim','name'],
+  });
+}
+
+function renderStudentLeave(container) {
+  const students = DB.getAll('students').filter(item => ['cuti', 'nonaktif'].includes(item.status));
+  const studyPrograms = DB.getAll('studyPrograms');
+  if (!students.length) {
+    container.innerHTML = renderStudentsEmptyState('Cuti & Aktif Kembali', 'Daftar mahasiswa cuti atau nonaktif.', 'Saat ini tidak ada mahasiswa yang sedang cuti atau menunggu aktif kembali.');
+    return;
+  }
+  container.innerHTML = `
+<div class="page-container">
+  <div class="page-header"><div class="page-header-info"><h1 class="page-title">Cuti & Aktif Kembali</h1><p class="page-desc">Daftar mahasiswa dengan status cuti atau nonaktif</p></div></div>
+  <div id="student-leave-table"></div>
+</div>`;
+  new DataTable({
+    containerId:'student-leave-table',
+    columns:[
+      {key:'nim',label:'NIM',render:r=>`<code>${r.nim}</code>`},
+      {key:'name',label:'Mahasiswa'},
+      {key:'prodiId',label:'Prodi',render:r=>studyPrograms.find(item=>item.id===r.prodiId)?.name||'-'},
+      {key:'semester',label:'Semester'},
+      {key:'status',label:'Status',render:r=>statusBadge(r.status)},
+    ],
+    data:students,
+    searchFields:['nim','name'],
+  });
+}
+
+function renderStudentScholarships(container) {
+  const scholarships = DB.getAll('scholarships');
+  const students = DB.getAll('students');
+  container.innerHTML = `
+<div class="page-container">
+  <div class="page-header"><div class="page-header-info"><h1 class="page-title">Beasiswa & Keringanan</h1><p class="page-desc">Daftar bantuan pembiayaan mahasiswa aktif</p></div></div>
+  <div id="student-scholarship-table"></div>
+</div>`;
+  new DataTable({
+    containerId:'student-scholarship-table',
+    columns:[
+      {key:'studentId',label:'Mahasiswa',render:r=>{const student=students.find(item=>item.id===r.studentId);return student?`<div>${student.name}</div><div style="font-size:10px;color:var(--color-muted)">${student.nim}</div>`:'-';}},
+      {key:'name',label:'Program'},
+      {key:'type',label:'Tipe',render:r=>statusBadge(r.type)},
+      {key:'amount',label:'Nominal',render:r=>new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(r.amount||0)},
+      {key:'period',label:'Periode'},
+      {key:'status',label:'Status',render:r=>statusBadge(r.status)},
+    ],
+    data:scholarships,
+    searchFields:['name','period'],
+  });
+}
+
+function renderStudentLetters(container) {
+  const letterServices = [
+    { service: 'Surat Keterangan Aktif Kuliah', sla: '1 hari kerja', owner: 'BAAK', status: 'tersedia' },
+    { service: 'Surat Pengantar Riset', sla: '2 hari kerja', owner: 'Program Studi', status: 'tersedia' },
+    { service: 'Surat Cuti Akademik', sla: '2 hari kerja', owner: 'BAAK', status: 'review manual' },
+  ];
+  container.innerHTML = `
+<div class="page-container">
+  <div class="page-header"><div class="page-header-info"><h1 class="page-title">Surat Akademik</h1><p class="page-desc">Jenis layanan surat dan status ketersediaan proses</p></div></div>
+  <div class="card">
+    <div class="scroll-x">
+      <table class="data-table">
+        <thead><tr><th>Layanan</th><th>Unit Proses</th><th>SLA</th><th>Status</th></tr></thead>
+        <tbody>${letterServices.map(item => `
+          <tr>
+            <td><strong>${item.service}</strong></td>
+            <td>${item.owner}</td>
+            <td>${item.sla}</td>
+            <td>${statusBadge(item.status)}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="info-box info-box-warning" style="margin-top:1rem"><i class="bi bi-info-circle"></i> Modul ini menampilkan katalog layanan. Riwayat pengajuan surat belum diisi pada data demo.</div>
+</div>`;
+}
+
+function renderStudentGraduation(container) {
+  const students = DB.getAll('students').filter(item => item.semester >= 7 && item.ipk >= 3);
+  const studyPrograms = DB.getAll('studyPrograms');
+  if (!students.length) {
+    container.innerHTML = renderStudentsEmptyState('Yudisium', 'Daftar calon peserta yudisium.', 'Belum ada mahasiswa yang memenuhi syarat yudisium pada data demo.');
+    return;
+  }
+  container.innerHTML = `
+<div class="page-container">
+  <div class="page-header"><div class="page-header-info"><h1 class="page-title">Yudisium</h1><p class="page-desc">Calon mahasiswa yang siap diverifikasi untuk yudisium</p></div></div>
+  <div id="student-graduation-table"></div>
+</div>`;
+  new DataTable({
+    containerId:'student-graduation-table',
+    columns:[
+      {key:'nim',label:'NIM',render:r=>`<code>${r.nim}</code>`},
+      {key:'name',label:'Mahasiswa'},
+      {key:'prodiId',label:'Prodi',render:r=>studyPrograms.find(item=>item.id===r.prodiId)?.name||'-'},
+      {key:'semester',label:'Semester'},
+      {key:'ipk',label:'IPK',render:r=>r.ipk.toFixed(2)},
+      {key:'status',label:'Status',render:()=>statusBadge('siap review')},
+    ],
+    data:students,
+    searchFields:['nim','name'],
+  });
+}
+
+function renderStudentCommencement(container) {
+  const students = DB.getAll('students').filter(item => item.status === 'lulus');
+  if (!students.length) {
+    container.innerHTML = renderStudentsEmptyState('Wisuda', 'Monitoring peserta wisuda dan persiapan administrasi.', 'Belum ada peserta wisuda pada seed demo. Setelah status mahasiswa lulus, data akan muncul di sini.');
+    return;
+  }
+  container.innerHTML = renderStudentsEmptyState('Wisuda', 'Monitoring peserta wisuda dan persiapan administrasi.', 'Data peserta wisuda akan disusun setelah penetapan kelulusan dan verifikasi yudisium.');
+}
+
+function renderStudentAlumni(container) {
+  const students = DB.getAll('students').filter(item => item.status === 'lulus');
+  if (!students.length) {
+    container.innerHTML = renderStudentsEmptyState('Alumni', 'Database lulusan dan tracer study.', 'Belum ada data alumni pada demo saat ini.');
+    return;
+  }
+  container.innerHTML = `
+<div class="page-container">
+  <div class="page-header"><div class="page-header-info"><h1 class="page-title">Alumni</h1><p class="page-desc">Ringkasan lulusan yang sudah berpindah ke basis data alumni</p></div></div>
+  <div id="student-alumni-table"></div>
+</div>`;
+  new DataTable({
+    containerId:'student-alumni-table',
+    columns:[
+      {key:'nim',label:'NIM',render:r=>`<code>${r.nim}</code>`},
+      {key:'name',label:'Nama'},
+      {key:'angkatan',label:'Angkatan'},
+      {key:'email',label:'Email'},
+      {key:'status',label:'Status',render:r=>statusBadge(r.status)},
+    ],
+    data:students,
+    searchFields:['nim','name','email'],
+  });
 }
 
 function buildStatusKPIs(students) {

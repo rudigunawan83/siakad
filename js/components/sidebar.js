@@ -32,9 +32,9 @@ const MENU_ITEMS = [
     key: 'admissions', icon: 'bi-person-plus', label: 'PMB',
     submenu: [
       { label: 'Dashboard PMB', route: '#/admissions/dashboard', key: 'admissions' },
+      { label: 'Periode & Jalur', route: '#/admissions/periods', key: 'admissions' },
       { label: 'Portal Publik PMB', route: '#/pmb', key: 'admissions' },
       { label: 'Daftar Online (Publik)', route: '#/pmb/daftar', key: 'admissions' },
-      { label: 'Periode & Jalur', route: '#/admissions/periods', key: 'admissions' },
       { label: 'Daftar Pendaftar', route: '#/admissions/applicants', key: 'admissions' },
       { label: 'Verifikasi Dokumen', route: '#/admissions/verification', key: 'admissions' },
       { label: 'Seleksi & Hasil', route: '#/admissions/selection', key: 'admissions' },
@@ -47,8 +47,8 @@ const MENU_ITEMS = [
     key: 'students', icon: 'bi-mortarboard', label: 'Mahasiswa',
     submenu: [
       { label: 'Data Mahasiswa', route: '#/students', key: 'students' },
-      { label: 'Registrasi Semester', route: '#/students/registration', key: 'students' },
       { label: 'Status Akademik', route: '#/students/academic-status', key: 'students' },
+      { label: 'Registrasi Semester', route: '#/students/registration', key: 'students' },
       { label: 'Cuti & Aktif Kembali', route: '#/students/leave', key: 'students' },
       { label: 'Beasiswa & Keringanan', route: '#/students/scholarships', key: 'students' },
       { label: 'Surat Akademik', route: '#/students/letters', key: 'students' },
@@ -61,22 +61,22 @@ const MENU_ITEMS = [
     key: 'lecturers', icon: 'bi-person-workspace', label: 'Dosen & SDM Akademik',
     submenu: [
       { label: 'Data Dosen', route: '#/lecturers', key: 'lecturers' },
-      { label: 'Tenaga Kependidikan', route: '#/lecturers/staff', key: 'lecturers' },
       { label: 'Penugasan Mengajar', route: '#/lecturers/assignments', key: 'lecturers' },
       { label: 'Beban Kerja Dosen', route: '#/lecturers/workload', key: 'lecturers' },
-      { label: 'Sertifikasi', route: '#/lecturers/certification', key: 'lecturers' },
       { label: 'Evaluasi Kinerja', route: '#/lecturers/evaluation', key: 'lecturers' },
+      { label: 'Sertifikasi', route: '#/lecturers/certification', key: 'lecturers' },
+      { label: 'Tenaga Kependidikan', route: '#/lecturers/staff', key: 'lecturers' },
     ]
   },
   {
     key: 'academic', icon: 'bi-journal-bookmark', label: 'Akademik',
     submenu: [
-      { label: 'Kurikulum', route: '#/academic/curriculum', key: 'academic' },
-      { label: 'Mata Kuliah', route: '#/academic/courses', key: 'academic' },
-      { label: 'Prasyarat MK', route: '#/academic/prerequisites', key: 'academic' },
       { label: 'Kelas Kuliah', route: '#/academic/classes', key: 'academic' },
       { label: 'Penjadwalan', route: '#/academic/schedule', key: 'academic' },
       { label: 'Dosen Wali', route: '#/academic/advisors', key: 'academic' },
+      { label: 'Mata Kuliah', route: '#/academic/courses', key: 'academic' },
+      { label: 'Kurikulum', route: '#/academic/curriculum', key: 'academic' },
+      { label: 'Prasyarat MK', route: '#/academic/prerequisites', key: 'academic' },
       { label: 'Evaluasi Akademik', route: '#/academic/evaluation', key: 'academic' },
     ]
   },
@@ -107,12 +107,12 @@ const MENU_ITEMS = [
     key: 'finance', icon: 'bi-cash-stack', label: 'Keuangan',
     submenu: [
       { label: 'Dashboard Keuangan', route: '#/finance/dashboard', key: 'finance' },
-      { label: 'Komponen Biaya', route: '#/finance/fee-components', key: 'finance' },
       { label: 'Tagihan Mahasiswa', route: '#/finance/invoices', key: 'finance' },
       { label: 'Pembayaran', route: '#/finance/payments', key: 'finance' },
       { label: 'Piutang', route: '#/finance/receivables', key: 'finance' },
       { label: 'Cicilan', route: '#/finance/installments', key: 'finance' },
       { label: 'Beasiswa & Potongan', route: '#/finance/discounts', key: 'finance' },
+      { label: 'Komponen Biaya', route: '#/finance/fee-components', key: 'finance' },
       { label: 'Jurnal Umum', route: '#/finance/journals', key: 'finance' },
       { label: 'Buku Besar', route: '#/finance/ledger', key: 'finance' },
       { label: 'Bagan Akun (COA)', route: '#/finance/coa', key: 'finance' },
@@ -123,7 +123,7 @@ const MENU_ITEMS = [
   {
     key: 'budget', icon: 'bi-pie-chart', label: 'Anggaran',
     submenu: [
-      { label: 'Ringkasan Anggaran', route: '#/budget/overview', key: 'budget' },
+      { label: 'Perencanaan Anggaran', route: '#/budget/overview', key: 'budget' },
       { label: 'Anggaran per Kampus', route: '#/budget/campus', key: 'budget' },
       { label: 'Pengajuan Anggaran', route: '#/budget/submission', key: 'budget' },
       { label: 'Persetujuan', route: '#/budget/approval', key: 'budget' },
@@ -148,11 +148,11 @@ const MENU_ITEMS = [
     key: 'assets', icon: 'bi-box-seam', label: 'Aset & Pengadaan',
     submenu: [
       { label: 'Master Aset', route: '#/assets', key: 'assets' },
-      { label: 'Kategori Aset', route: '#/assets/categories', key: 'assets' },
+      { label: 'Pemeliharaan', route: '#/assets/maintenance', key: 'assets' },
       { label: 'Pengajuan Pengadaan', route: '#/procurement', key: 'assets' },
       { label: 'Persetujuan Pengadaan', route: '#/procurement/approval', key: 'assets' },
       { label: 'Penerimaan Barang', route: '#/procurement/receipt', key: 'assets' },
-      { label: 'Pemeliharaan', route: '#/assets/maintenance', key: 'assets' },
+      { label: 'Kategori Aset', route: '#/assets/categories', key: 'assets' },
       { label: 'Laporan Aset', route: '#/assets/reports', key: 'assets' },
     ]
   },
@@ -185,6 +185,62 @@ const MENU_ITEMS = [
     route: '#/audit-logs',
   },
 ];
+
+const ROLE_SUBMENU_ROUTE_SCOPE = {
+  foundation: {
+    dashboard: [
+      '#/dashboard/foundation',
+    ],
+    organization: [
+      '#/organization/profile',
+      '#/organization/campuses',
+      '#/organization/faculties',
+      '#/organization/study-programs',
+      '#/organization/academic-years',
+      '#/organization/semesters',
+    ],
+    admissions: [
+      '#/admissions/dashboard',
+      '#/admissions/applicants',
+      '#/admissions/selection',
+      '#/admissions/re-registration',
+      '#/admissions/reports',
+    ],
+    finance: [
+      '#/finance/dashboard',
+      '#/finance/receivables',
+      '#/finance/ledger',
+      '#/finance/reports',
+      '#/finance/consolidation',
+    ],
+    budget: [
+      '#/budget/overview',
+      '#/budget/campus',
+      '#/budget/realization',
+      '#/budget/variance',
+    ],
+    hr: [
+      '#/hr/employees',
+      '#/hr/payroll',
+      '#/hr/reports',
+    ],
+    assets: [
+      '#/assets',
+      '#/assets/reports',
+    ],
+    pddikti: [
+      '#/pddikti/validation',
+      '#/pddikti/queue',
+      '#/pddikti/history',
+    ],
+  },
+};
+
+function isSubmenuVisibleForRole(roleId, menuKey, route) {
+  const roleScope = ROLE_SUBMENU_ROUTE_SCOPE[roleId];
+  if (!roleScope || !roleScope[menuKey]) return true;
+  return roleScope[menuKey].includes(route);
+}
 
 /** Navigasi portal dosen (design.md 9.0) — menempel di sidebar kiri shell */
 function buildLecturerPortalNav(h) {
@@ -327,7 +383,10 @@ export function renderSidebar() {
     if (!AppState.hasAccess(item.key)) return;
 
     if (item.submenu) {
-      const subItems = item.submenu.filter(s => AppState.hasAccess(s.key));
+      const subItems = item.submenu.filter(s =>
+        AppState.hasAccess(s.key) &&
+        isSubmenuVisibleForRole(role.id, item.key, s.route)
+      );
       if (!subItems.length) return;
 
       const submenuId = `submenu-${item.key}`;

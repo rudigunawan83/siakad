@@ -15,6 +15,11 @@ export function renderHR(path, container) {
   const hsub = Object.keys(hrSubs).find(r => path.includes(r));
   if (hsub) { container.innerHTML = renderComingSoon(hrSubs[hsub], 'SDM & HR', path); return; }
 
+  if (path.includes('/positions')) return renderHrPositions(container);
+  if (path.includes('/attendance')) return renderHrAttendance(container, path);
+  if (path.includes('/leave')) return renderHrLeave(container, path);
+  if (path.includes('/salary-components')) return renderHrSalaryComponents(container);
+  if (path.includes('/reports')) return renderHrReports(container);
   if (path.includes('/payroll') || path.includes('/payslip')) return renderPayroll(container);
   renderEmployees(container);
 }
@@ -56,6 +61,91 @@ function renderEmployees(container) {
     data:employees, searchFields:['name','empId','position'],
   });
   document.getElementById('exp-emp')?.addEventListener('click',()=>exportCSV(employees,'pegawai',[{key:'empId',label:'ID'},{key:'name',label:'Nama'},{key:'unit',label:'Unit'},{key:'position',label:'Jabatan'},{key:'type',label:'Tipe'},{key:'status',label:'Status'}]));
+}
+
+function renderHrPositions(container) {
+  const employees = DB.getAll('employees');
+  const rows = Object.values(employees.reduce((acc, employee) => {
+    const key = employee.position;
+    if (!acc[key]) acc[key] = { position: key, unit: employee.unit, count: 0, avgSalary: 0, totalSalary: 0 };
+    acc[key].count += 1;
+    acc[key].totalSalary += employee.salary || 0;
+    acc[key].avgSalary = Math.round(acc[key].totalSalary / acc[key].count);
+    return acc;
+  }, {}));
+
+  container.innerHTML = `
+<div class="page-container">
+  <div class="page-header"><div class="page-header-info"><h1 class="page-title">Struktur Jabatan</h1><p class="page-desc">Ringkasan jabatan aktif berdasarkan data pegawai demo</p></div></div>
+  <div class="card">
+    <div class="scroll-x">
+      <table class="data-table">
+        <thead><tr><th>Jabatan</th><th>Unit</th><th>Jumlah Pegawai</th><th>Rata-rata Gaji Pokok</th></tr></thead>
+        <tbody>${rows.map(row => `
+          <tr>
+            <td><strong>${row.position}</strong></td>
+            <td>${row.unit}</td>
+            <td>${row.count}</td>
+            <td>${formatRupiah(row.avgSalary)}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>`;
+}
+
+function renderHrAttendance(container, path) {
+  container.innerHTML = renderComingSoon('Kehadiran Pegawai', 'SDM & Payroll', path);
+}
+
+function renderHrLeave(container, path) {
+  container.innerHTML = renderComingSoon('Cuti Pegawai', 'SDM & Payroll', path);
+}
+
+function renderHrSalaryComponents(container) {
+  const components = [
+    { name: 'Gaji Pokok', type: 'pendapatan', taxable: 'Ya', note: 'Komponen tetap bulanan' },
+    { name: 'Tunjangan Jabatan', type: 'pendapatan', taxable: 'Ya', note: 'Sesuai struktur jabatan demo' },
+    { name: 'Tunjangan Transportasi', type: 'pendapatan', taxable: 'Ya', note: 'Bersifat tetap (simulasi)' },
+    { name: 'BPJS Kesehatan', type: 'potongan', taxable: 'Tidak', note: 'Potongan payroll demo' },
+    { name: 'BPJS Ketenagakerjaan', type: 'potongan', taxable: 'Tidak', note: 'Potongan payroll demo' },
+    { name: 'PPh 21', type: 'potongan', taxable: 'Ya', note: 'Estimasi untuk prototype' },
+  ];
+  container.innerHTML = `
+<div class="page-container">
+  <div class="page-header"><div class="page-header-info"><h1 class="page-title">Komponen Gaji</h1><p class="page-desc">Komponen pendapatan dan potongan payroll demo</p></div></div>
+  <div class="card">
+    <div class="scroll-x">
+      <table class="data-table">
+        <thead><tr><th>Komponen</th><th>Tipe</th><th>Kena Pajak</th><th>Keterangan</th></tr></thead>
+        <tbody>${components.map(row => `
+          <tr>
+            <td><strong>${row.name}</strong></td>
+            <td>${statusBadge(row.type === 'pendapatan' ? 'aktif' : 'diperiksa', { aktif:'badge-success', diperiksa:'badge-warning' })}</td>
+            <td>${row.taxable}</td>
+            <td>${row.note}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>`;
+}
+
+function renderHrReports(container) {
+  const employees = DB.getAll('employees');
+  const payrollRuns = DB.getAll('payrollRuns');
+  const totalNet = payrollRuns.reduce((sum, row) => sum + (row.totalNet || 0), 0);
+  container.innerHTML = `
+<div class="page-container">
+  <div class="page-header"><div class="page-header-info"><h1 class="page-title">Laporan SDM</h1><p class="page-desc">Ringkasan tenaga kerja dan payroll lintas kampus</p></div></div>
+  <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr)">
+    <div class="kpi-card kpi-card-navy"><div class="kpi-value">${employees.length}</div><div class="kpi-label">Pegawai Aktif</div></div>
+    <div class="kpi-card kpi-card-success"><div class="kpi-value">${payrollRuns.length}</div><div class="kpi-label">Batch Payroll</div></div>
+    <div class="kpi-card kpi-card-warning"><div class="kpi-value">${formatRupiah(totalNet)}</div><div class="kpi-label">Total Gaji Bersih</div></div>
+  </div>
+</div>`;
 }
 
 function renderPayroll(container) {
@@ -125,6 +215,11 @@ function renderPayroll(container) {
 
 // ===================== ASSETS =====================
 export function renderAssets(path, container) {
+  if (path.includes('/categories')) return renderAssetCategories(container);
+  if (path.includes('/maintenance')) return renderAssetMaintenance(container);
+  if (path.includes('/approval')) return renderProcurementApproval(container);
+  if (path.includes('/receipt')) return renderProcurementReceipt(container);
+  if (path.includes('/reports')) return renderAssetReports(container);
   if (path.includes('/procurement')) return renderProcurement(container);
   renderAssetList(container);
 }
@@ -181,29 +276,138 @@ function renderProcurement(container) {
   window.rejectProcurement  = id=>{DB.update('procurementRequests',id,{status:'ditolak'});showToast('Pengadaan ditolak (simulasi).','warning');renderProcurement(container);};
 }
 
-// ===================== BUDGET =====================
-export function renderBudget(path, container) {
-  const budgets  = DB.getAll('budgets');
-  const campuses = DB.getAll('campuses');
-  const total2026 = budgets.filter(b=>b.year===2026&&b.status==='disetujui');
-  const totalApproved = total2026.reduce((s,b)=>s+b.approved,0);
-  const totalRealized = total2026.reduce((s,b)=>s+b.realized,0);
+function renderAssetCategories(container) {
+  const assets = DB.getAll('assets');
+  const rows = Object.values(assets.reduce((acc, asset) => {
+    if (!acc[asset.category]) acc[asset.category] = { category: asset.category, count: 0, value: 0 };
+    acc[asset.category].count += 1;
+    acc[asset.category].value += asset.acquiredValue || 0;
+    return acc;
+  }, {}));
   container.innerHTML = `
 <div class="page-container">
-  <div class="page-header"><div class="page-header-info"><h1 class="page-title">Anggaran 2026</h1></div><div class="page-actions"><button class="btn btn-accent"><i class="bi bi-plus-lg"></i> Ajukan Anggaran</button></div></div>
-  <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:1.5rem">
-    <div class="kpi-card kpi-card-navy"><div class="kpi-value">${formatRupiah(totalApproved)}</div><div class="kpi-label">Total Anggaran Disetujui 2026</div></div>
-    <div class="kpi-card kpi-card-success"><div class="kpi-value">${formatRupiah(totalRealized)}</div><div class="kpi-label">Total Realisasi</div><div class="kpi-trend up"><i class="bi bi-arrow-up-short"></i> ${Math.round(totalRealized/totalApproved*100)}% dari total anggaran</div></div>
-    <div class="kpi-card kpi-card-warning"><div class="kpi-value">${formatRupiah(totalApproved-totalRealized)}</div><div class="kpi-label">Sisa Anggaran</div></div>
+  <div class="page-header"><div class="page-header-info"><h1 class="page-title">Kategori Aset</h1><p class="page-desc">Ringkasan aset berdasarkan kategori</p></div></div>
+  <div class="card">
+    <div class="scroll-x">
+      <table class="data-table">
+        <thead><tr><th>Kategori</th><th>Jumlah Aset</th><th>Nilai Perolehan</th></tr></thead>
+        <tbody>${rows.map(row => `
+          <tr>
+            <td><strong>${row.category}</strong></td>
+            <td>${row.count}</td>
+            <td>${formatRupiah(row.value)}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
   </div>
-  <div class="chart-grid" style="margin-bottom:1.5rem">
-    <div class="chart-card"><div class="chart-card-header"><h3 class="chart-card-title">Anggaran vs Realisasi per Unit</h3></div><div class="chart-wrapper" style="height:240px"><canvas id="bud-chart"></canvas></div></div>
-    <div class="chart-card"><div class="chart-card-header"><h3 class="chart-card-title">Alokasi per Kampus</h3></div><div class="chart-wrapper" style="height:240px"><canvas id="bud-campus"></canvas></div></div>
-  </div>
-  <div id="bud-table"></div>
+</div>`;
+}
+
+function renderAssetMaintenance(container) {
+  const assets = DB.getAll('assets').filter(asset => asset.condition !== 'baik' || asset.status !== 'aktif');
+  container.innerHTML = `
+<div class="page-container">
+  <div class="page-header"><div class="page-header-info"><h1 class="page-title">Pemeliharaan Aset</h1><p class="page-desc">Aset yang perlu perhatian berdasarkan kondisi atau status</p></div></div>
+  <div id="asset-maint-table"></div>
 </div>`;
   new DataTable({
-    containerId:'bud-table',
+    containerId:'asset-maint-table',
+    columns:[
+      {key:'code',label:'Kode',render:r=>`<code>${r.code}</code>`},
+      {key:'name',label:'Nama Aset'},
+      {key:'category',label:'Kategori'},
+      {key:'location',label:'Lokasi'},
+      {key:'condition',label:'Kondisi',render:r=>statusBadge(r.condition)},
+      {key:'status',label:'Status',render:r=>statusBadge(r.status)},
+    ],
+    data:assets, searchFields:['code','name','location','category'],
+  });
+}
+
+function renderProcurementApproval(container) {
+  const procs = DB.getAll('procurementRequests').filter(item => ['diajukan', 'menunggu persetujuan'].includes(item.status));
+  const campuses = DB.getAll('campuses');
+  container.innerHTML = `
+<div class="page-container">
+  <div class="page-header"><div class="page-header-info"><h1 class="page-title">Persetujuan Pengadaan</h1><p class="page-desc">Pengajuan yang sedang menunggu keputusan</p></div></div>
+  <div id="proc-approval-table"></div>
+</div>`;
+  new DataTable({
+    containerId:'proc-approval-table',
+    columns:[
+      {key:'reqNum',label:'No. Pengajuan',render:r=>`<strong>${r.reqNum}</strong>`},
+      {key:'campusId',label:'Kampus',render:r=>campuses.find(c=>c.id===r.campusId)?.code||'-'},
+      {key:'itemName',label:'Item'},
+      {key:'estimatedCost',label:'Estimasi',render:r=>formatRupiah(r.estimatedCost)},
+      {key:'status',label:'Status',render:r=>statusBadge(r.status)},
+    ],
+    data:procs, searchFields:['reqNum','itemName'],
+  });
+}
+
+function renderProcurementReceipt(container) {
+  const procs = DB.getAll('procurementRequests').filter(item => ['disetujui', 'terima barang'].includes(item.status));
+  const campuses = DB.getAll('campuses');
+  container.innerHTML = `
+<div class="page-container">
+  <div class="page-header"><div class="page-header-info"><h1 class="page-title">Penerimaan Barang</h1><p class="page-desc">Pengadaan yang sudah disetujui atau diterima</p></div></div>
+  <div id="proc-receipt-table"></div>
+</div>`;
+  new DataTable({
+    containerId:'proc-receipt-table',
+    columns:[
+      {key:'reqNum',label:'No. Pengajuan',render:r=>`<strong>${r.reqNum}</strong>`},
+      {key:'campusId',label:'Kampus',render:r=>campuses.find(c=>c.id===r.campusId)?.code||'-'},
+      {key:'itemName',label:'Item'},
+      {key:'approvedDate',label:'Tgl. Approval',render:r=>formatDate(r.approvedDate)},
+      {key:'status',label:'Status',render:r=>statusBadge(r.status)},
+    ],
+    data:procs, searchFields:['reqNum','itemName'],
+  });
+}
+
+function renderAssetReports(container) {
+  const assets = DB.getAll('assets');
+  const totalValue = assets.reduce((sum, item) => sum + (item.acquiredValue || 0), 0);
+  const activeCount = assets.filter(item => item.status === 'aktif').length;
+  container.innerHTML = `
+<div class="page-container">
+  <div class="page-header"><div class="page-header-info"><h1 class="page-title">Laporan Aset</h1><p class="page-desc">Ringkasan nilai perolehan dan kondisi aset</p></div></div>
+  <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr)">
+    <div class="kpi-card kpi-card-navy"><div class="kpi-value">${assets.length}</div><div class="kpi-label">Total Aset</div></div>
+    <div class="kpi-card kpi-card-success"><div class="kpi-value">${activeCount}</div><div class="kpi-label">Aset Aktif</div></div>
+    <div class="kpi-card kpi-card-warning"><div class="kpi-value">${formatRupiah(totalValue)}</div><div class="kpi-label">Nilai Perolehan</div></div>
+  </div>
+</div>`;
+}
+
+// ===================== BUDGET =====================
+export function renderBudget(path, container) {
+  if (path.includes('/campus')) return renderBudgetByCampus(container);
+  if (path.includes('/submission')) return renderBudgetSubmission(container);
+  if (path.includes('/approval')) return renderBudgetApproval(container);
+  if (path.includes('/realization')) return renderBudgetRealization(container);
+  if (path.includes('/variance')) return renderBudgetVariance(container);
+  return renderBudgetOverview(container);
+}
+
+function getFilteredBudgets() {
+  const budgets = DB.getAll('budgets');
+  const campusFilter = AppState.currentCampusFilter;
+  return campusFilter === 'all' ? budgets : budgets.filter(b => b.campusId === campusFilter);
+}
+
+function getBudgetCampuses() {
+  const campuses = DB.getAll('campuses');
+  return AppState.currentCampusFilter === 'all'
+    ? campuses
+    : campuses.filter(c => c.id === AppState.currentCampusFilter);
+}
+
+function mountBudgetTable(containerId, data, campuses, onApprove) {
+  new DataTable({
+    containerId,
     columns:[
       {key:'year',label:'Tahun'},
       {key:'campusId',label:'Kampus',render:r=>campuses.find(c=>c.id===r.campusId)?.code||'-'},
@@ -214,11 +418,44 @@ export function renderBudget(path, container) {
       {key:'remaining',label:'Sisa',render:r=>formatRupiah(r.remaining)},
       {key:'percent',label:'%',render:r=>`<div style="display:flex;align-items:center;gap:0.5rem"><div class="progress-bar-wrap" style="width:60px"><div class="progress-bar-fill ${r.percent>90?'fill-danger':r.percent>70?'fill-warning':'fill-success'}" style="width:${r.percent}%"></div></div><span>${r.percent}%</span></div>`},
       {key:'status',label:'Status',render:r=>statusBadge(r.status)},
-      {key:'_act',label:'Aksi',sortable:false,render:r=>r.status==='diajukan anggaran'?`<button class="btn btn-success btn-sm" onclick="approveBudget('${r.id}')"><i class="bi bi-check2"></i> Setujui</button>`:'-'},
+      {key:'_act',label:'Aksi',sortable:false,render:r=>onApprove && r.status==='diajukan anggaran' ? `<button class="btn btn-success btn-sm" data-approve="${r.id}"><i class="bi bi-check2"></i> Setujui</button>` : '-'},
     ],
-    data:budgets, searchFields:['unitName','campusId'],
+    data,
+    searchFields:['unitName','campusId','category'],
   });
-  window.approveBudget = id=>{DB.update('budgets',id,{status:'disetujui',approvedBy:`${AppState.currentRole.user} (demo)`});showToast('Anggaran disetujui (simulasi).','success');renderBudget(path,container);};
+
+  if (onApprove) {
+    document.querySelectorAll(`[data-approve]`).forEach(btn => {
+      btn.addEventListener('click', () => onApprove(btn.dataset.approve));
+    });
+  }
+}
+
+function renderBudgetOverview(container) {
+  const budgets = getFilteredBudgets();
+  const campuses = getBudgetCampuses();
+  const total2026 = budgets.filter(b=>b.year===2026&&b.status==='disetujui');
+  const totalApproved = total2026.reduce((s,b)=>s+b.approved,0);
+  const totalRealized = total2026.reduce((s,b)=>s+b.realized,0);
+  container.innerHTML = `
+<div class="page-container">
+  <div class="page-header"><div class="page-header-info"><h1 class="page-title">Perencanaan Anggaran</h1><p class="page-desc">Ringkasan anggaran lintas unit dan kampus</p></div><div class="page-actions"><a href="#/budget/submission" class="btn btn-accent"><i class="bi bi-plus-lg"></i> Pengajuan Anggaran</a></div></div>
+  <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:1.5rem">
+    <div class="kpi-card kpi-card-navy"><div class="kpi-value">${formatRupiah(totalApproved)}</div><div class="kpi-label">Total Anggaran Disetujui 2026</div></div>
+    <div class="kpi-card kpi-card-success"><div class="kpi-value">${formatRupiah(totalRealized)}</div><div class="kpi-label">Total Realisasi</div><div class="kpi-trend up"><i class="bi bi-arrow-up-short"></i> ${totalApproved ? Math.round(totalRealized/totalApproved*100) : 0}% dari total anggaran</div></div>
+    <div class="kpi-card kpi-card-warning"><div class="kpi-value">${formatRupiah(totalApproved-totalRealized)}</div><div class="kpi-label">Sisa Anggaran</div></div>
+  </div>
+  <div class="chart-grid" style="margin-bottom:1.5rem">
+    <div class="chart-card"><div class="chart-card-header"><h3 class="chart-card-title">Anggaran vs Realisasi per Unit</h3></div><div class="chart-wrapper" style="height:240px"><canvas id="bud-chart"></canvas></div></div>
+    <div class="chart-card"><div class="chart-card-header"><h3 class="chart-card-title">Alokasi per Kampus</h3></div><div class="chart-wrapper" style="height:240px"><canvas id="bud-campus"></canvas></div></div>
+  </div>
+  <div id="bud-table"></div>
+</div>`;
+  mountBudgetTable('bud-table', budgets, campuses, (id) => {
+    DB.update('budgets',id,{status:'disetujui',approvedBy:`${AppState.currentRole.user} (demo)`});
+    showToast('Anggaran disetujui (simulasi).','success');
+    renderBudgetOverview(container);
+  });
   requestAnimationFrame(()=>{
     const units = total2026.map(b=>b.unitName.split(' ').slice(-1)[0]);
     createBarChart('bud-chart',{labels:units,datasets:[{label:'Disetujui',data:total2026.map(b=>b.approved),color:'#213550'},{label:'Realisasi',data:total2026.map(b=>b.realized),color:'#198754'}],height:240,formatY:formatRupiahShort});
@@ -226,8 +463,116 @@ export function renderBudget(path, container) {
   });
 }
 
+function renderBudgetByCampus(container) {
+  const budgets = getFilteredBudgets().filter(b => b.year === 2026);
+  const campuses = getBudgetCampuses();
+  const rows = campuses.map(campus => {
+    const items = budgets.filter(b => b.campusId === campus.id);
+    const approved = items.reduce((sum, item) => sum + item.approved, 0);
+    const realized = items.reduce((sum, item) => sum + item.realized, 0);
+    return { code: campus.code, name: campus.name, unitCount: items.length, approved, realized, remaining: approved - realized };
+  });
+  container.innerHTML = `
+<div class="page-container">
+  <div class="page-header"><div class="page-header-info"><h1 class="page-title">Anggaran per Kampus</h1><p class="page-desc">Perbandingan alokasi dan realisasi antar kampus</p></div></div>
+  <div class="card">
+    <div class="scroll-x">
+      <table class="data-table">
+        <thead><tr><th>Kampus</th><th>Unit</th><th>Disetujui</th><th>Realisasi</th><th>Sisa</th></tr></thead>
+        <tbody>${rows.map(row => `
+          <tr>
+            <td><strong>${row.code}</strong><div style="font-size:10px;color:var(--color-muted)">${row.name}</div></td>
+            <td>${row.unitCount}</td>
+            <td>${formatRupiah(row.approved)}</td>
+            <td style="color:var(--color-success)">${formatRupiah(row.realized)}</td>
+            <td style="color:${row.remaining > 0 ? 'var(--color-warning)' : 'var(--color-success)'}">${formatRupiah(row.remaining)}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>`;
+}
+
+function renderBudgetSubmission(container) {
+  const budgets = getFilteredBudgets().filter(b => ['diajukan anggaran', 'perlu revisi'].includes(b.status));
+  const campuses = getBudgetCampuses();
+  container.innerHTML = `
+<div class="page-container">
+  <div class="page-header"><div class="page-header-info"><h1 class="page-title">Pengajuan Anggaran</h1><p class="page-desc">Daftar anggaran yang masih diajukan atau perlu revisi</p></div></div>
+  <div id="budget-submission-table"></div>
+</div>`;
+  mountBudgetTable('budget-submission-table', budgets, campuses, null);
+}
+
+function renderBudgetApproval(container) {
+  const budgets = getFilteredBudgets().filter(b => b.status === 'diajukan anggaran');
+  const campuses = getBudgetCampuses();
+  container.innerHTML = `
+<div class="page-container">
+  <div class="page-header"><div class="page-header-info"><h1 class="page-title">Persetujuan Anggaran</h1><p class="page-desc">Pengajuan yang menunggu persetujuan pimpinan/pengurus</p></div></div>
+  <div id="budget-approval-table"></div>
+</div>`;
+  mountBudgetTable('budget-approval-table', budgets, campuses, (id) => {
+    DB.update('budgets',id,{status:'disetujui',approvedBy:`${AppState.currentRole.user} (demo)`});
+    showToast('Pengajuan anggaran disetujui (simulasi).','success');
+    renderBudgetApproval(container);
+  });
+}
+
+function renderBudgetRealization(container) {
+  const budgets = getFilteredBudgets().filter(b => b.status === 'disetujui');
+  const campuses = getBudgetCampuses();
+  const totalRealized = budgets.reduce((sum, item) => sum + item.realized, 0);
+  container.innerHTML = `
+<div class="page-container">
+  <div class="page-header"><div class="page-header-info"><h1 class="page-title">Realisasi Anggaran</h1><p class="page-desc">Total realisasi tercatat: <strong style="color:var(--color-success)">${formatRupiah(totalRealized)}</strong></p></div></div>
+  <div id="budget-realization-table"></div>
+</div>`;
+  mountBudgetTable('budget-realization-table', budgets, campuses, null);
+}
+
+function renderBudgetVariance(container) {
+  const budgets = getFilteredBudgets().filter(b => b.status === 'disetujui').map(item => ({
+    ...item,
+    variance: (item.approved || 0) - (item.realized || 0),
+  }));
+  const campuses = getBudgetCampuses();
+  container.innerHTML = `
+<div class="page-container">
+  <div class="page-header"><div class="page-header-info"><h1 class="page-title">Analisis Varians</h1><p class="page-desc">Analisis selisih antara anggaran disetujui dan realisasi</p></div></div>
+  <div class="card">
+    <div class="scroll-x">
+      <table class="data-table">
+        <thead><tr><th>Tahun</th><th>Kampus</th><th>Unit</th><th>Disetujui</th><th>Realisasi</th><th>Varians</th><th>% Pakai</th></tr></thead>
+        <tbody>${budgets.map(row => `
+          <tr>
+            <td>${row.year}</td>
+            <td>${campuses.find(c => c.id === row.campusId)?.code || '-'}</td>
+            <td><strong>${row.unitName}</strong></td>
+            <td>${formatRupiah(row.approved)}</td>
+            <td style="color:var(--color-success)">${formatRupiah(row.realized)}</td>
+            <td style="color:${row.variance < 0 ? 'var(--color-danger)' : 'var(--color-warning)'}">${formatRupiah(Math.abs(row.variance))}</td>
+            <td>${row.percent}%</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>`;
+}
+
 // ===================== PDDIKTI =====================
 export function renderPDDIKTI(path, container) {
+  if (path.includes('/students')) return renderPddiktiList(container, 'Batch Mahasiswa', 'Antrian data mahasiswa untuk validasi dan sinkronisasi.', job => job.type === 'Mahasiswa');
+  if (path.includes('/lecturers')) return renderPddiktiList(container, 'Batch Dosen', 'Daftar sinkronisasi data dosen ke feeder PDDIKTI.', job => job.type === 'Dosen');
+  if (path.includes('/grades')) return renderPddiktiList(container, 'Batch Nilai & KRS', 'Monitoring pengiriman data akademik perkuliahan.', job => ['Nilai', 'KRS'].includes(job.type));
+  if (path.includes('/queue')) return renderPddiktiList(container, 'Antrean Sinkronisasi', 'Batch yang masih menunggu proses atau perlu dibenahi.', job => ['siap disinkronkan', 'perlu perbaikan'].includes(job.status));
+  if (path.includes('/history')) return renderPddiktiList(container, 'Riwayat Sinkronisasi', 'Seluruh riwayat batch PDDIKTI lintas kampus.', () => true, true);
+  return renderPddiktiDashboard(path, container);
+}
+
+function renderPddiktiDashboard(path, container) {
   const jobs     = DB.getAll('pddiktiJobs');
   const campuses = DB.getAll('campuses');
   const statusColors = {'simulasi berhasil':'#198754','simulasi gagal sebagian':'#dc3545','perlu perbaikan':'#d97706','siap disinkronkan':'#0d6efd','simulasi berhasil sebagian':'#d97706'};
@@ -274,27 +619,64 @@ export function renderPDDIKTI(path, container) {
     DB.update('pddiktiJobs',id,{status:'simulasi berhasil',synced:job.valid,failed:job.needFix,date:new Date().toISOString().slice(0,10)});
     DB.log('Simulasi Sinkronisasi PDDIKTI','PDDIKTI',`Batch: ${job.batch}`,'Simulasi Berhasil');
     showToast(`Sinkronisasi batch ${job.batch} selesai (simulasi). ${job.valid} data berhasil.`,'gold');
-    renderPDDIKTI(path,container);
+    renderPddiktiDashboard(path,container);
   };
   document.getElementById('sync-all')?.addEventListener('click',()=>{
     const allJobs = DB.getAll('pddiktiJobs');
     allJobs.forEach(j=>DB.update('pddiktiJobs',j.id,{status:'simulasi berhasil',synced:j.valid,date:new Date().toISOString().slice(0,10)}));
     showToast(`Semua ${allJobs.length} batch berhasil disinkronkan (simulasi).`,'gold');
-    renderPDDIKTI(path,container);
+    renderPddiktiDashboard(path,container);
+  });
+}
+
+function renderPddiktiList(container, title, desc, predicate, sortByDateDesc = false) {
+  const campuses = DB.getAll('campuses');
+  const statusColors = {'simulasi berhasil':'#198754','simulasi gagal sebagian':'#dc3545','perlu perbaikan':'#d97706','siap disinkronkan':'#0d6efd','simulasi berhasil sebagian':'#d97706'};
+  const jobs = DB.getAll('pddiktiJobs').filter(predicate);
+  if (sortByDateDesc) jobs.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  container.innerHTML = `
+<div class="page-container">
+  <div class="page-header"><div class="page-header-info"><h1 class="page-title">${title}</h1><p class="page-desc">${desc}</p></div></div>
+  <div id="pddikti-list-table"></div>
+</div>`;
+  new DataTable({
+    containerId:'pddikti-list-table',
+    columns:[
+      {key:'batch',label:'Batch',render:r=>`<code>${r.batch}</code>`},
+      {key:'type',label:'Tipe Data'},
+      {key:'campusId',label:'Kampus',render:r=>campuses.find(c=>c.id===r.campusId)?.code||'-'},
+      {key:'total',label:'Total'},
+      {key:'valid',label:'Valid',render:r=>`<span style="color:var(--color-success)">${r.valid}</span>`},
+      {key:'needFix',label:'Perlu Perbaikan',render:r=>r.needFix>0?`<span style="color:var(--color-danger)">${r.needFix}</span>`:r.needFix},
+      {key:'synced',label:'Tersinkron',render:r=>`<strong>${r.synced}</strong>`},
+      {key:'date',label:'Tanggal',render:r=>formatDate(r.date)},
+      {key:'status',label:'Status',render:r=>`<span class="badge" style="background:${statusColors[r.status]||'#6b7280'}22;color:${statusColors[r.status]||'#6b7280'}">${r.status}</span>`},
+    ],
+    data:jobs,
+    searchFields:['batch','type'],
   });
 }
 
 // ===================== REPORTS =====================
 export function renderReports(path, container) {
+  if (path.includes('/academic')) return renderAcademicReports(container);
+  if (path.includes('/admissions')) return renderAdmissionsReports(container);
+  if (path.includes('/finance')) return renderFinanceReportsSummary(container);
+  if (path.includes('/hr')) return renderHrReports(container);
+  if (path.includes('/assets')) return renderAssetReports(container);
+  if (path.includes('/budget')) return renderBudgetReportsSummary(container);
+  if (path.includes('/pddikti')) return renderPddiktiReportsSummary(container);
+  if (path.includes('/consolidation')) return renderConsolidationReportsSummary(container);
+
   const reportCategories = [
     { icon:'bi-mortarboard', title:'Laporan Akademik', desc:'Transkrip, KHS, statistik mahasiswa, IPK', color:'#213550', route:'#/reports/academic' },
-    { icon:'bi-cash-stack', title:'Laporan Keuangan', desc:'Penerimaan, piutang, laporan L/R', color:'#198754', route:'#/finance/reports' },
-    { icon:'bi-person-plus', title:'Laporan PMB', desc:'Statistik pendaftaran, konversi, sumber', color:'#d97706', route:'#/admissions/reports' },
-    { icon:'bi-people', title:'Laporan SDM', desc:'Data pegawai, payroll, absensi', color:'#0d6efd', route:'#/hr/reports' },
-    { icon:'bi-box-seam', title:'Laporan Aset', desc:'Inventaris, kondisi, penyusutan', color:'#6f42c1', route:'#/assets/reports' },
-    { icon:'bi-pie-chart', title:'Laporan Anggaran', desc:'Realisasi, varians, forecast', color:'#d1a84b', route:'#/budget/overview' },
-    { icon:'bi-cloud-upload', title:'Laporan PDDIKTI', desc:'Riwayat sinkronisasi dan validasi', color:'#20c997', route:'#/pddikti/history' },
-    { icon:'bi-building', title:'Laporan Konsolidasi', desc:'Ringkasan lintas kampus untuk yayasan', color:'#fd7e14', route:'#/finance/consolidation' },
+    { icon:'bi-cash-stack', title:'Laporan Keuangan', desc:'Penerimaan, piutang, laporan L/R', color:'#198754', route:'#/reports/finance' },
+    { icon:'bi-person-plus', title:'Laporan PMB', desc:'Statistik pendaftaran, konversi, sumber', color:'#d97706', route:'#/reports/admissions' },
+    { icon:'bi-people', title:'Laporan SDM', desc:'Data pegawai, payroll, absensi', color:'#0d6efd', route:'#/reports/hr' },
+    { icon:'bi-box-seam', title:'Laporan Aset', desc:'Inventaris, kondisi, penyusutan', color:'#6f42c1', route:'#/reports/assets' },
+    { icon:'bi-pie-chart', title:'Laporan Anggaran', desc:'Realisasi, varians, forecast', color:'#d1a84b', route:'#/reports/budget' },
+    { icon:'bi-cloud-upload', title:'Laporan PDDIKTI', desc:'Riwayat sinkronisasi dan validasi', color:'#20c997', route:'#/reports/pddikti' },
+    { icon:'bi-building', title:'Laporan Konsolidasi', desc:'Ringkasan lintas kampus untuk yayasan', color:'#fd7e14', route:'#/reports/consolidation' },
   ];
   container.innerHTML = `
 <div class="page-container">
@@ -321,6 +703,111 @@ export function renderReports(path, container) {
       const statusG={};invoices.forEach(i=>{statusG[i.status]=(statusG[i.status]||0)+1;});
       cD('rpt-inv',{labels:Object.keys(statusG),data:Object.values(statusG),colors:['#198754','#d97706','#dc3545','#0d6efd','#9ca3af'],height:220});
     });
+  });
+}
+
+function renderAcademicReports(container) {
+  const students = DB.getAll('students');
+  const grades = DB.getAll('grades').filter(item => item.status === 'final');
+  const active = students.filter(item => item.status === 'aktif').length;
+  const avgGpa = students.reduce((sum, item) => sum + (item.ipk || 0), 0) / (students.length || 1);
+  const passedCourses = grades.filter(item => (item.finalScore || 0) >= 60).length;
+  container.innerHTML = `
+<div class="page-container">
+  <div class="page-header"><div class="page-header-info"><h1 class="page-title">Laporan Akademik</h1><p class="page-desc">Ringkasan performa akademik mahasiswa aktif</p></div></div>
+  <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr)">
+    <div class="kpi-card kpi-card-navy"><div class="kpi-value">${active}</div><div class="kpi-label">Mahasiswa Aktif</div></div>
+    <div class="kpi-card kpi-card-success"><div class="kpi-value">${avgGpa.toFixed(2)}</div><div class="kpi-label">Rata-rata IPK</div></div>
+    <div class="kpi-card kpi-card-info"><div class="kpi-value">${passedCourses}</div><div class="kpi-label">Nilai Final Lulus</div></div>
+  </div>
+</div>`;
+}
+
+function renderAdmissionsReports(container) {
+  const admissions = DB.getAll('admissions');
+  const converted = admissions.filter(item => item.status === 'menjadi mahasiswa').length;
+  const passed = admissions.filter(item => item.selectionStatus === 'lulus seleksi').length;
+  container.innerHTML = `
+<div class="page-container">
+  <div class="page-header"><div class="page-header-info"><h1 class="page-title">Laporan PMB</h1><p class="page-desc">Funnel pendaftaran, seleksi, dan konversi mahasiswa baru</p></div></div>
+  <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr)">
+    <div class="kpi-card kpi-card-warning"><div class="kpi-value">${admissions.length}</div><div class="kpi-label">Total Pendaftar</div></div>
+    <div class="kpi-card kpi-card-info"><div class="kpi-value">${passed}</div><div class="kpi-label">Lulus Seleksi</div></div>
+    <div class="kpi-card kpi-card-success"><div class="kpi-value">${converted}</div><div class="kpi-label">Jadi Mahasiswa</div></div>
+  </div>
+</div>`;
+}
+
+function renderFinanceReportsSummary(container) {
+  const invoices = DB.getAll('invoices');
+  const paid = invoices.reduce((sum, item) => sum + (item.paid || 0), 0);
+  const remaining = invoices.reduce((sum, item) => sum + (item.remaining || 0), 0);
+  container.innerHTML = `
+<div class="page-container">
+  <div class="page-header"><div class="page-header-info"><h1 class="page-title">Laporan Keuangan</h1><p class="page-desc">Ringkasan penerimaan dan saldo piutang mahasiswa</p></div></div>
+  <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr)">
+    <div class="kpi-card kpi-card-success"><div class="kpi-value">${formatRupiah(paid)}</div><div class="kpi-label">Pembayaran Tercatat</div></div>
+    <div class="kpi-card kpi-card-warning"><div class="kpi-value">${formatRupiah(remaining)}</div><div class="kpi-label">Sisa Piutang</div></div>
+    <div class="kpi-card kpi-card-navy"><div class="kpi-value">${invoices.length}</div><div class="kpi-label">Total Tagihan</div></div>
+  </div>
+</div>`;
+}
+
+function renderBudgetReportsSummary(container) {
+  const budgetItems = DB.getAll('budgets').filter(item => item.status === 'disetujui');
+  const totalBudget = budgetItems.reduce((sum, item) => sum + (item.approved || 0), 0);
+  const realized = budgetItems.reduce((sum, item) => sum + (item.realized || 0), 0);
+  container.innerHTML = `
+<div class="page-container">
+  <div class="page-header"><div class="page-header-info"><h1 class="page-title">Laporan Anggaran</h1><p class="page-desc">Monitoring pagu, realisasi, dan sisa anggaran</p></div></div>
+  <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr)">
+    <div class="kpi-card kpi-card-gold"><div class="kpi-value">${formatRupiah(totalBudget)}</div><div class="kpi-label">Total Anggaran</div></div>
+    <div class="kpi-card kpi-card-success"><div class="kpi-value">${formatRupiah(realized)}</div><div class="kpi-label">Realisasi</div></div>
+    <div class="kpi-card kpi-card-warning"><div class="kpi-value">${formatRupiah(totalBudget - realized)}</div><div class="kpi-label">Sisa Anggaran</div></div>
+  </div>
+</div>`;
+}
+
+function renderPddiktiReportsSummary(container) {
+  const jobs = DB.getAll('pddiktiJobs');
+  const synced = jobs.reduce((sum, item) => sum + (item.synced || 0), 0);
+  const needFix = jobs.reduce((sum, item) => sum + (item.needFix || 0), 0);
+  container.innerHTML = `
+<div class="page-container">
+  <div class="page-header"><div class="page-header-info"><h1 class="page-title">Laporan PDDIKTI</h1><p class="page-desc">Ringkasan validasi, antrean, dan sinkronisasi feeder</p></div></div>
+  <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr)">
+    <div class="kpi-card kpi-card-info"><div class="kpi-value">${jobs.length}</div><div class="kpi-label">Total Batch</div></div>
+    <div class="kpi-card kpi-card-success"><div class="kpi-value">${synced}</div><div class="kpi-label">Data Tersinkron</div></div>
+    <div class="kpi-card kpi-card-danger"><div class="kpi-value">${needFix}</div><div class="kpi-label">Perlu Perbaikan</div></div>
+  </div>
+</div>`;
+}
+
+function renderConsolidationReportsSummary(container) {
+  const campuses = DB.getAll('campuses');
+  const students = DB.getAll('students');
+  const invoices = DB.getAll('invoices');
+  const rows = campuses.map(campus => ({
+    campus: campus.code,
+    students: students.filter(item => item.campusId === campus.id && item.status === 'aktif').length,
+    paid: invoices.filter(item => item.campusId === campus.id).reduce((sum, item) => sum + (item.paid || 0), 0),
+    receivables: invoices.filter(item => item.campusId === campus.id).reduce((sum, item) => sum + (item.remaining || 0), 0),
+  }));
+  container.innerHTML = `
+<div class="page-container">
+  <div class="page-header"><div class="page-header-info"><h1 class="page-title">Laporan Konsolidasi</h1><p class="page-desc">Perbandingan ringkas performa lintas kampus</p></div></div>
+  <div id="report-consolidation-table"></div>
+</div>`;
+  new DataTable({
+    containerId:'report-consolidation-table',
+    columns:[
+      {key:'campus',label:'Kampus'},
+      {key:'students',label:'Mahasiswa Aktif'},
+      {key:'paid',label:'Pembayaran',render:r=>formatRupiah(r.paid)},
+      {key:'receivables',label:'Piutang',render:r=>formatRupiah(r.receivables)},
+    ],
+    data:rows,
+    searchFields:['campus'],
   });
 }
 

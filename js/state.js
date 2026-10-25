@@ -137,7 +137,7 @@ export const ROLES = [
 
 // ---- Menu Permissions per Role ----
 const MENU_ACCESS = {
-  'foundation':       ['dashboard','organization','admissions','students','lecturers','academic','learning','thesis','finance','budget','hr','assets','pddikti','reports','settings','audit'],
+  'foundation':       ['dashboard','organization','admissions','finance','budget','hr','assets','pddikti','reports','audit'],
   'admin-foundation': ['dashboard','organization','admissions','students','lecturers','academic','learning','thesis','finance','budget','hr','assets','pddikti','reports','settings','audit'],
   'rector':           ['dashboard','admissions','students','lecturers','academic','learning','thesis','finance','budget','hr','assets','pddikti','reports','audit'],
   'dean':             ['dashboard','students','lecturers','academic','learning','thesis','reports'],
